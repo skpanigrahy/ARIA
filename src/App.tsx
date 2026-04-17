@@ -7,6 +7,7 @@ import DecisionEngine from './pages/DecisionEngine';
 import DecisionIntelligence from './pages/DecisionIntelligence';
 import ProductionFeedback from './pages/ProductionFeedback';
 import Architecture from './pages/Architecture';
+import Integrations from './pages/Integrations';
 import type { NavigationPage } from './types';
 
 export default function App() {
@@ -26,6 +27,8 @@ export default function App() {
         return <ProductionFeedback />;
       case 'architecture':
         return <Architecture />;
+      case 'integrations':
+        return <Integrations />;
       default:
         return <Dashboard />;
     }

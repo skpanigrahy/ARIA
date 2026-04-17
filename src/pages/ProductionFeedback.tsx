@@ -1,10 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AlertTriangle, CheckCircle, RotateCcw, Zap, TrendingDown, TrendingUp, Play } from 'lucide-react';
 import { SeverityBadge } from '../components/ui/Badge';
 import { MiniTrustBar } from '../components/ui/TrustRing';
-import { PRODUCTION_FEEDBACK } from '../data/decisionData';
-import { AGENTS } from '../data/agentData';
-import type { ProductionFeedback } from '../types';
+import { fetchProductionFeedback, fetchAgents } from '../lib/database';
+import type { ProductionFeedback, Agent } from '../types';
 
 const EVENT_CONFIG = {
   INCIDENT: { icon: AlertTriangle, color: '#E3B341', label: 'Incident' },
@@ -66,11 +65,11 @@ function FeedbackCard({ feedback }: { feedback: ProductionFeedback }) {
   );
 }
 
-function AgentTrustImpactRow({ agentId }: { agentId: string }) {
-  const agent = AGENTS.find(a => a.id === agentId);
+function AgentTrustImpactRow({ agentId, agents, feedbacks: allFeedbacks }: { agentId: string; agents: Agent[]; feedbacks: ProductionFeedback[] }) {
+  const agent = agents.find(a => a.id === agentId);
   if (!agent) return null;
 
-  const feedbacks = PRODUCTION_FEEDBACK.filter(f => f.agentId === agentId);
+  const feedbacks = allFeedbacks.filter(f => f.agentId === agentId);
   const totalIncidents = feedbacks.filter(f => f.eventType === 'INCIDENT' || f.eventType === 'ROLLBACK' || f.eventType === 'SECURITY_BREACH').length;
   const totalClean = feedbacks.filter(f => f.eventType === 'CLEAN_DEPLOY').length;
   const totalDelta = feedbacks.reduce((s, f) => s + f.trustDelta, 0);
@@ -164,9 +163,17 @@ function SimulatePanel() {
 }
 
 export default function ProductionFeedback() {
-  const uniqueAgentIds = [...new Set(PRODUCTION_FEEDBACK.map(f => f.agentId))];
-  const incidentCount = PRODUCTION_FEEDBACK.filter(f => ['INCIDENT', 'ROLLBACK', 'SECURITY_BREACH'].includes(f.eventType)).length;
-  const cleanCount = PRODUCTION_FEEDBACK.filter(f => f.eventType === 'CLEAN_DEPLOY').length;
+  const [feedbackList, setFeedbackList] = useState<ProductionFeedback[]>([]);
+  const [agents, setAgents] = useState<Agent[]>([]);
+
+  useEffect(() => {
+    fetchProductionFeedback().then(setFeedbackList);
+    fetchAgents().then(setAgents);
+  }, []);
+
+  const uniqueAgentIds = [...new Set(feedbackList.map(f => f.agentId))];
+  const incidentCount = feedbackList.filter(f => ['INCIDENT', 'ROLLBACK', 'SECURITY_BREACH'].includes(f.eventType)).length;
+  const cleanCount = feedbackList.filter(f => f.eventType === 'CLEAN_DEPLOY').length;
 
   return (
     <div className="space-y-5">
@@ -186,7 +193,7 @@ export default function ProductionFeedback() {
 
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: 'Production Events', value: PRODUCTION_FEEDBACK.length, color: '#58A6FF' },
+          { label: 'Production Events', value: feedbackList.length, color: '#58A6FF' },
           { label: 'Incidents & Rollbacks', value: incidentCount, color: '#F85149' },
           { label: 'Clean Deploys', value: cleanCount, color: '#3FB950' },
         ].map(s => (
@@ -200,7 +207,7 @@ export default function ProductionFeedback() {
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <div className="xl:col-span-2 space-y-3">
           <h3 className="text-[#E6EDF3] font-semibold text-sm">Event Timeline</h3>
-          {[...PRODUCTION_FEEDBACK].sort((a, b) =>
+          {[...feedbackList].sort((a, b) =>
             new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime()
           ).map(fb => (
             <FeedbackCard key={fb.id} feedback={fb} />
@@ -212,7 +219,7 @@ export default function ProductionFeedback() {
             <h3 className="text-[#E6EDF3] font-semibold text-sm mb-4">Trust Impact by Agent</h3>
             <div>
               {uniqueAgentIds.map(id => (
-                <AgentTrustImpactRow key={id} agentId={id} />
+                <AgentTrustImpactRow key={id} agentId={id} agents={agents} feedbacks={feedbackList} />
               ))}
             </div>
           </div>

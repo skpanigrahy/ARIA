@@ -1,15 +1,18 @@
+import { useState, useEffect } from 'react';
 import { Bot, Shield, AlertTriangle, CheckCircle, TrendingDown, Clock } from 'lucide-react';
 import MetricCard from '../components/ui/MetricCard';
 import { DecisionBadge } from '../components/ui/Badge';
 import { MiniTrustBar } from '../components/ui/TrustRing';
+import { fetchAgents, fetchDecisions } from '../lib/database';
 import { AGENTS } from '../data/agentData';
 import { HISTORICAL_DECISIONS } from '../data/decisionData';
+import type { Agent, EvaluationResult } from '../types';
 
-function TrustDistributionChart() {
-  const high = AGENTS.filter(a => a.trustLevel === 'HIGH').length;
-  const med = AGENTS.filter(a => a.trustLevel === 'MEDIUM').length;
-  const low = AGENTS.filter(a => a.trustLevel === 'LOW').length;
-  const total = AGENTS.length;
+function TrustDistributionChart({ agents }: { agents: Agent[] }) {
+  const high = agents.filter(a => a.trustLevel === 'HIGH').length;
+  const med = agents.filter(a => a.trustLevel === 'MEDIUM').length;
+  const low = agents.filter(a => a.trustLevel === 'LOW').length;
+  const total = agents.length || 1;
 
   const highPct = (high / total) * 100;
   const medPct = (med / total) * 100;
@@ -113,16 +116,24 @@ function SparkLine({ data, color }: { data: number[]; color: string }) {
 }
 
 export default function Dashboard() {
-  const totalAgents = AGENTS.length;
-  const highRiskAgents = AGENTS.filter(a => a.trustLevel === 'LOW').length;
-  const totalDecisions = HISTORICAL_DECISIONS.length;
-  const avgTrust = AGENTS.reduce((s, a) => s + a.trustScore, 0) / AGENTS.length;
+  const [agents, setAgents] = useState<Agent[]>(AGENTS);
+  const [decisions, setDecisions] = useState<EvaluationResult[]>(HISTORICAL_DECISIONS);
 
-  const blockedCount = HISTORICAL_DECISIONS.filter(d => d.decision === 'BLOCK').length;
-  const reviewCount = HISTORICAL_DECISIONS.filter(d => d.decision === 'REVIEW').length;
-  const allowCount = HISTORICAL_DECISIONS.filter(d => d.decision === 'ALLOW').length;
+  useEffect(() => {
+    fetchAgents().then(setAgents);
+    fetchDecisions().then(setDecisions);
+  }, []);
 
-  const sortedAgents = [...AGENTS].sort((a, b) => b.trustScore - a.trustScore);
+  const totalAgents = agents.length;
+  const highRiskAgents = agents.filter(a => a.trustLevel === 'LOW').length;
+  const totalDecisions = decisions.length || 1;
+  const avgTrust = agents.length > 0 ? agents.reduce((s, a) => s + a.trustScore, 0) / agents.length : 0;
+
+  const blockedCount = decisions.filter(d => d.decision === 'BLOCK').length;
+  const reviewCount = decisions.filter(d => d.decision === 'REVIEW').length;
+  const allowCount = decisions.filter(d => d.decision === 'ALLOW').length;
+
+  const sortedAgents = [...agents].sort((a, b) => b.trustScore - a.trustScore);
 
   return (
     <div className="space-y-6">
@@ -154,7 +165,7 @@ export default function Dashboard() {
         />
         <MetricCard
           label="Total Decisions"
-          value={totalDecisions}
+          value={decisions.length}
           subLabel={`${allowCount} allow · ${reviewCount} review · ${blockedCount} block`}
           accentColor="amber"
           icon={<CheckCircle size={14} />}
@@ -162,7 +173,7 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <TrustDistributionChart />
+        <TrustDistributionChart agents={agents} />
 
         <div className="bg-[#161B22] border border-[#21262D] rounded-xl p-5">
           <h3 className="text-[#E6EDF3] font-semibold text-sm mb-4">Decision Breakdown</h3>
@@ -214,7 +225,7 @@ export default function Dashboard() {
           </div>
         </div>
         <div>
-          {HISTORICAL_DECISIONS.map(decision => (
+          {decisions.map(decision => (
             <RecentDecisionRow key={decision.id} result={decision} />
           ))}
         </div>

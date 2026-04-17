@@ -8,6 +8,7 @@ const PAGE_TITLES: Record<NavigationPage, { title: string; subtitle: string }> =
   'decision-intelligence': { title: 'Decision Intelligence', subtitle: 'Full decision history and reasoning trails' },
   'production-feedback': { title: 'Production Feedback', subtitle: 'Outcomes feeding back into trust scores' },
   architecture: { title: 'Architecture', subtitle: 'Platform design and component overview' },
+  integrations: { title: 'Integrations', subtitle: 'Webhook endpoints and connected systems' },
 };
 
 interface TopBarProps {

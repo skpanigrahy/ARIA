@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ChevronRight, GitPullRequest, AlertCircle, CheckCircle, TrendingUp, TrendingDown, Minus, X, Clock } from 'lucide-react';
 import TrustRing from '../components/ui/TrustRing';
 import { TrustBadge, AgentTypeBadge } from '../components/ui/Badge';
-import { AGENTS, getTrustHistoryForAgent } from '../data/agentData';
-import type { Agent } from '../types';
+import { fetchAgents, fetchTrustHistory } from '../lib/database';
+import { AGENTS } from '../data/agentData';
+import type { Agent, TrustHistoryEntry } from '../types';
 
 function TrustTrendIcon({ trend }: { trend: Agent['recentTrend'] }) {
   if (trend === 'up') return <TrendingUp size={12} className="text-[#3FB950]" />;
@@ -12,7 +13,8 @@ function TrustTrendIcon({ trend }: { trend: Agent['recentTrend'] }) {
 }
 
 function TrustTimeline({ agentId }: { agentId: string }) {
-  const history = getTrustHistoryForAgent(agentId);
+  const [history, setHistory] = useState<TrustHistoryEntry[]>([]);
+  useEffect(() => { fetchTrustHistory(agentId).then(setHistory); }, [agentId]);
 
   const EVENT_ICONS: Record<string, { icon: typeof CheckCircle; color: string }> = {
     REGISTRATION: { icon: CheckCircle, color: '#58A6FF' },
@@ -195,22 +197,25 @@ function AgentCard({ agent, onClick }: { agent: Agent; onClick: () => void }) {
 
 export default function AgentRegistry() {
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
+  const [agents, setAgents] = useState<Agent[]>(AGENTS);
+
+  useEffect(() => { fetchAgents().then(setAgents); }, []);
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-[#8B949E] text-sm">
-            {AGENTS.length} registered agents ·{' '}
-            <span className="text-[#3FB950]">{AGENTS.filter(a => a.trustLevel === 'HIGH').length} high trust</span>{' '}·{' '}
-            <span className="text-[#E3B341]">{AGENTS.filter(a => a.trustLevel === 'MEDIUM').length} medium</span>{' '}·{' '}
-            <span className="text-[#F85149]">{AGENTS.filter(a => a.trustLevel === 'LOW').length} low trust</span>
+            {agents.length} registered agents ·{' '}
+            <span className="text-[#3FB950]">{agents.filter(a => a.trustLevel === 'HIGH').length} high trust</span>{' '}·{' '}
+            <span className="text-[#E3B341]">{agents.filter(a => a.trustLevel === 'MEDIUM').length} medium</span>{' '}·{' '}
+            <span className="text-[#F85149]">{agents.filter(a => a.trustLevel === 'LOW').length} low trust</span>
           </p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {AGENTS.map(agent => (
+        {agents.map(agent => (
           <AgentCard
             key={agent.id}
             agent={agent}

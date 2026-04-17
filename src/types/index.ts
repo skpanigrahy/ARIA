@@ -121,4 +121,5 @@ export type NavigationPage =
   | 'decision-engine'
   | 'decision-intelligence'
   | 'production-feedback'
-  | 'architecture';
+  | 'architecture'
+  | 'integrations';

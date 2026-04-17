@@ -7,6 +7,7 @@ import {
   Network,
   ChevronRight,
   Shield,
+  Plug,
 } from 'lucide-react';
 import type { NavigationPage } from '../../types';
 
@@ -23,6 +24,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'decision-engine', label: 'Decision Engine', icon: Zap },
   { id: 'decision-intelligence', label: 'Decision Intelligence', icon: Search },
   { id: 'production-feedback', label: 'Production Feedback', icon: Activity },
+  { id: 'integrations', label: 'Integrations', icon: Plug },
   { id: 'architecture', label: 'Architecture', icon: Network },
 ];
 

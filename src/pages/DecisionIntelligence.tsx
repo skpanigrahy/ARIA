@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Search, ChevronDown, X, FileText, Shield } from 'lucide-react';
 import { DecisionBadge, CriticalityBadge, AgentTypeBadge } from '../components/ui/Badge';
 import RiskBar from '../components/ui/RiskBar';
 import TrustRing from '../components/ui/TrustRing';
+import { fetchDecisions } from '../lib/database';
 import { HISTORICAL_DECISIONS } from '../data/decisionData';
 import type { EvaluationResult, DecisionType } from '../types';
 
@@ -117,8 +118,11 @@ export default function DecisionIntelligence() {
   const [search, setSearch] = useState('');
   const [filterDecision, setFilterDecision] = useState<DecisionType | 'ALL'>('ALL');
   const [selectedDecision, setSelectedDecision] = useState<EvaluationResult | null>(null);
+  const [allDecisions, setAllDecisions] = useState<EvaluationResult[]>(HISTORICAL_DECISIONS);
 
-  const filtered = HISTORICAL_DECISIONS.filter(d => {
+  useEffect(() => { fetchDecisions().then(setAllDecisions); }, []);
+
+  const filtered = allDecisions.filter(d => {
     const matchesSearch =
       d.pr.title.toLowerCase().includes(search.toLowerCase()) ||
       d.pr.serviceName.toLowerCase().includes(search.toLowerCase()) ||
@@ -160,10 +164,10 @@ export default function DecisionIntelligence() {
 
       <div className="grid grid-cols-4 gap-3">
         {[
-          { label: 'Total Decisions', value: HISTORICAL_DECISIONS.length, color: '#58A6FF' },
-          { label: 'Approved', value: HISTORICAL_DECISIONS.filter(d => d.decision === 'ALLOW').length, color: '#3FB950' },
-          { label: 'Review Required', value: HISTORICAL_DECISIONS.filter(d => d.decision === 'REVIEW').length, color: '#E3B341' },
-          { label: 'Blocked', value: HISTORICAL_DECISIONS.filter(d => d.decision === 'BLOCK').length, color: '#F85149' },
+          { label: 'Total Decisions', value: allDecisions.length, color: '#58A6FF' },
+          { label: 'Approved', value: allDecisions.filter(d => d.decision === 'ALLOW').length, color: '#3FB950' },
+          { label: 'Review Required', value: allDecisions.filter(d => d.decision === 'REVIEW').length, color: '#E3B341' },
+          { label: 'Blocked', value: allDecisions.filter(d => d.decision === 'BLOCK').length, color: '#F85149' },
         ].map(s => (
           <div key={s.label} className="bg-[#161B22] border border-[#21262D] rounded-xl p-4 text-center">
             <p className="text-2xl font-bold tabular-nums" style={{ color: s.color }}>{s.value}</p>
