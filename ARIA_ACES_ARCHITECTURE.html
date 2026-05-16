@@ -1,0 +1,1056 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>ARIA + ACES — Complete Platform Architecture</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap');
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --interaction:#6366f1;
+  --aria:#00c8ff;
+  --aces-core:#f59e0b;
+  --aces-mcp:#ef4444;
+  --data:#8b5cf6;
+  --integration:#10b981;
+  --obs:#06b6d4;
+  --security:#f97316;
+  --bg:#05070d;--s0:#080c14;--s1:#0c1220;--s2:#101828;
+  --border:#1e2d42;--border2:#253347;
+  --text:#e2eaf4;--muted:#4a6080;--dim:#1a2535;
+}
+body{background:var(--bg);color:var(--text);font-family:'IBM Plex Sans',sans-serif;min-height:100vh;}
+
+/* HEADER */
+.hdr{
+  background:var(--s0);border-bottom:1px solid var(--border);
+  padding:12px 28px;display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:100;
+}
+.hdr-brand{display:flex;align-items:center;gap:10px;}
+.hdr-logo{
+  width:30px;height:30px;border-radius:6px;
+  background:linear-gradient(135deg,var(--aria),#0055aa);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;color:#000;
+}
+.hdr-name{font-size:13px;font-weight:600;}
+.hdr-sub{font-size:9px;color:var(--muted);font-family:'IBM Plex Mono',monospace;letter-spacing:1.5px;}
+.legend{display:flex;gap:14px;flex-wrap:wrap;}
+.leg{display:flex;align-items:center;gap:5px;font-size:9px;color:var(--muted);font-family:'IBM Plex Mono',monospace;}
+.leg-sq{width:9px;height:9px;border-radius:2px;}
+
+/* CANVAS */
+.canvas{padding:16px 20px 40px;display:flex;flex-direction:column;gap:6px;min-width:1500px;}
+
+/* CONNECTOR */
+.connector{
+  display:flex;align-items:center;justify-content:center;height:24px;
+  gap:8px;font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:1px;
+}
+.conn-line{flex:1;max-width:180px;height:1px;background:linear-gradient(90deg,transparent,var(--border2),transparent);}
+
+/* LAYER */
+.layer{border-radius:10px;border:1px solid;padding:14px 16px;position:relative;}
+.layer-lbl{
+  position:absolute;top:-10px;left:18px;
+  font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:600;letter-spacing:2px;
+  padding:2px 10px;border-radius:3px;
+}
+
+/* LAYER THEMES */
+.L-interaction{border-color:rgba(99,102,241,0.35);background:rgba(99,102,241,0.025);}
+.L-interaction .layer-lbl{background:rgba(99,102,241,0.15);color:var(--interaction);border:1px solid rgba(99,102,241,0.35);}
+
+.L-aria{border-color:rgba(0,200,255,0.5);background:rgba(0,200,255,0.03);border-width:2px;}
+.L-aria .layer-lbl{background:rgba(0,200,255,0.15);color:var(--aria);border:1px solid rgba(0,200,255,0.5);font-size:10px;padding:3px 12px;}
+
+.L-aces-core{border-color:rgba(245,158,11,0.35);background:rgba(245,158,11,0.02);}
+.L-aces-core .layer-lbl{background:rgba(245,158,11,0.12);color:var(--aces-core);border:1px solid rgba(245,158,11,0.35);}
+
+.L-aces-mcp{border-color:rgba(239,68,68,0.35);background:rgba(239,68,68,0.02);}
+.L-aces-mcp .layer-lbl{background:rgba(239,68,68,0.12);color:var(--aces-mcp);border:1px solid rgba(239,68,68,0.35);}
+
+.L-data{border-color:rgba(139,92,246,0.35);background:rgba(139,92,246,0.02);}
+.L-data .layer-lbl{background:rgba(139,92,246,0.12);color:var(--data);border:1px solid rgba(139,92,246,0.35);}
+
+.L-integration{border-color:rgba(16,185,129,0.35);background:rgba(16,185,129,0.02);}
+.L-integration .layer-lbl{background:rgba(16,185,129,0.12);color:var(--integration);border:1px solid rgba(16,185,129,0.35);}
+
+.L-obs{border-color:rgba(6,182,212,0.35);background:rgba(6,182,212,0.02);}
+.L-obs .layer-lbl{background:rgba(6,182,212,0.12);color:var(--obs);border:1px solid rgba(6,182,212,0.35);}
+
+.L-security{border-color:rgba(249,115,22,0.35);background:rgba(249,115,22,0.02);}
+.L-security .layer-lbl{background:rgba(249,115,22,0.12);color:var(--security);border:1px solid rgba(249,115,22,0.35);}
+
+/* MODULE */
+.mod{
+  background:var(--s1);border:1px solid var(--border);border-radius:7px;padding:10px 12px;
+  transition:border-color 0.2s;position:relative;overflow:hidden;cursor:default;
+}
+.mod::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
+.mod:hover{border-color:var(--border2);}
+.mod-icon{font-size:17px;margin-bottom:4px;display:block;}
+.mod-title{font-size:10.5px;font-weight:600;margin-bottom:2px;line-height:1.3;}
+.mod-desc{font-size:9px;color:var(--muted);line-height:1.5;}
+.mod-sub{font-size:8.5px;color:var(--muted);margin-top:3px;font-family:'IBM Plex Mono',monospace;}
+.badge-new{
+  position:absolute;top:5px;right:6px;
+  font-family:'IBM Plex Mono',monospace;font-size:7px;letter-spacing:1px;
+  background:rgba(0,200,255,0.15);color:var(--aria);
+  border:1px solid rgba(0,200,255,0.35);padding:1px 5px;border-radius:2px;
+}
+.badge-fixed{
+  position:absolute;top:5px;right:6px;
+  font-family:'IBM Plex Mono',monospace;font-size:7px;letter-spacing:1px;
+  background:rgba(16,185,129,0.12);color:var(--integration);
+  border:1px solid rgba(16,185,129,0.3);padding:1px 5px;border-radius:2px;
+}
+
+/* Color accents per layer */
+.c-interaction .mod::after{background:var(--interaction);}
+.c-aria .mod::after{background:var(--aria);}
+.c-aria .mod{background:rgba(0,200,255,0.04);border-color:rgba(0,200,255,0.15);}
+.c-aria .mod:hover{border-color:rgba(0,200,255,0.35);}
+.c-aces-core .mod::after{background:var(--aces-core);}
+.c-aces-mcp .mod::after{background:var(--aces-mcp);}
+.c-data .mod::after{background:var(--data);}
+.c-integration .mod::after{background:var(--integration);}
+.c-obs .mod::after{background:var(--obs);}
+.c-security .mod::after{background:var(--security);}
+
+/* GRIDS */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
+.g4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;}
+.g5{display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:8px;}
+.g6{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;}
+.g7{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;}
+
+/* ARIA PIPELINE */
+.aria-pipeline{
+  display:flex;align-items:stretch;gap:0;
+  background:rgba(0,200,255,0.03);
+  border:1px solid rgba(0,200,255,0.2);border-radius:8px;
+  overflow:hidden;margin-bottom:10px;
+}
+.ap{flex:1;padding:10px 11px;border-right:1px solid rgba(0,200,255,0.12);position:relative;}
+.ap:last-child{border-right:none;}
+.ap-n{font-family:'IBM Plex Mono',monospace;font-size:8px;color:rgba(0,200,255,0.5);margin-bottom:3px;}
+.ap-t{font-size:10px;font-weight:600;color:var(--aria);margin-bottom:2px;}
+.ap-d{font-size:8.5px;color:var(--muted);line-height:1.4;}
+.ap-arr{
+  position:absolute;right:-6px;top:50%;transform:translateY(-50%);
+  width:11px;height:11px;background:var(--aria);border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:7px;color:#000;font-weight:700;z-index:2;
+}
+
+/* TRUST BANDS */
+.trust-row{display:flex;gap:5px;margin-top:8px;}
+.tb{flex:1;border-radius:4px;padding:5px;text-align:center;}
+.tb-l{font-size:8px;margin-bottom:1px;}
+.tb-v{font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:600;}
+
+/* DECISION OUTCOMES */
+.decision-row{display:flex;gap:5px;margin-top:8px;}
+.dec{flex:1;border-radius:4px;padding:6px;text-align:center;}
+.dec-icon{font-size:13px;display:block;margin-bottom:2px;}
+.dec-l{font-family:'IBM Plex Mono',monospace;font-size:8px;font-weight:600;}
+.dec-d{font-size:8px;color:var(--muted);margin-top:1px;}
+
+/* ORCH FLOW */
+.orch-flow{
+  display:flex;align-items:center;gap:3px;
+  background:rgba(245,158,11,0.04);border:1px solid rgba(245,158,11,0.15);
+  border-radius:8px;padding:10px;margin-bottom:10px;
+}
+.of{flex:1;text-align:center;padding:8px 6px;background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.15);border-radius:6px;}
+.of-icon{font-size:15px;display:block;margin-bottom:2px;}
+.of-name{font-size:9px;font-weight:600;color:var(--aces-core);}
+.of-desc{font-size:7.5px;color:var(--muted);margin-top:1px;}
+.of-arr{color:rgba(245,158,11,0.35);font-size:13px;flex-shrink:0;}
+
+/* TOOL ENGINE */
+.tool-engine{
+  background:rgba(239,68,68,0.07);border:2px solid rgba(239,68,68,0.35);
+  border-radius:8px;padding:12px;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;min-height:90px;text-align:center;
+}
+.te-t{font-size:12px;font-weight:700;color:var(--aces-mcp);margin-bottom:3px;}
+.te-s{font-size:9px;color:var(--muted);margin-bottom:6px;}
+.te-tags{display:flex;gap:4px;flex-wrap:wrap;justify-content:center;}
+.te-tag{font-family:'IBM Plex Mono',monospace;font-size:8px;padding:1px 6px;border-radius:2px;background:rgba(239,68,68,0.1);color:var(--aces-mcp);}
+
+/* MCP LAYOUT */
+.mcp-layout{display:grid;grid-template-columns:190px 1fr 190px;gap:8px;}
+.mcp-col{display:flex;flex-direction:column;gap:8px;}
+
+/* SIDE PANELS */
+.side-layout{display:grid;grid-template-columns:1fr 200px;gap:8px;}
+.side-layout-3{display:grid;grid-template-columns:1fr 1fr 180px;gap:8px;}
+
+/* ORACLE BADGE */
+.oracle-badge{
+  display:inline-flex;align-items:center;gap:4px;
+  background:rgba(220,50,50,0.12);border:1px solid rgba(220,50,50,0.3);
+  border-radius:4px;padding:2px 8px;
+  font-family:'IBM Plex Mono',monospace;font-size:8px;color:#ff6b6b;
+  margin-top:4px;
+}
+
+/* FEATURES LIST */
+.feat-list{display:flex;flex-direction:column;gap:4px;margin-top:8px;}
+.feat-item{display:flex;align-items:center;gap:6px;font-size:9px;color:var(--muted);}
+.feat-item::before{content:'✓';color:var(--integration);font-weight:700;flex-shrink:0;}
+
+/* SECTION TITLE inside layer */
+.section-title{
+  font-family:'IBM Plex Mono',monospace;font-size:8.5px;letter-spacing:2px;
+  color:var(--muted);margin-bottom:8px;font-weight:600;
+}
+
+/* ROW layout */
+.row{display:flex;gap:8px;}
+.row .mod{flex:1;}
+
+/* INFO BOX */
+.info-box{
+  background:rgba(0,200,255,0.04);border:1px solid rgba(0,200,255,0.15);
+  border-radius:6px;padding:8px 10px;
+}
+.info-box-title{font-size:9px;color:var(--aria);font-family:'IBM Plex Mono',monospace;letter-spacing:1px;margin-bottom:5px;}
+.info-box-text{font-size:9px;color:var(--muted);line-height:1.5;}
+
+/* ARROW LABEL */
+.arrow-label{
+  display:flex;align-items:center;gap:6px;padding:3px 0;
+  font-size:8.5px;color:var(--muted);font-family:'IBM Plex Mono',monospace;
+}
+.arrow-label::before{content:'→';color:var(--aria);}
+
+/* SCROLLWRAP */
+.scrollwrap{overflow-x:auto;overflow-y:visible;}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="hdr">
+  <div class="hdr-brand">
+    <div class="hdr-logo">A</div>
+    <div>
+      <div class="hdr-name">ARIA + ACES — Complete Platform Architecture</div>
+      <div class="hdr-sub">JPMORGAN CHASE · GOVERNANCE + EXECUTION · ORACLE BACKEND</div>
+    </div>
+  </div>
+  <div class="legend">
+    <div class="leg"><div class="leg-sq" style="background:var(--interaction)"></div>Interaction</div>
+    <div class="leg"><div class="leg-sq" style="background:var(--aria)"></div>ARIA Governance ★ NEW</div>
+    <div class="leg"><div class="leg-sq" style="background:var(--aces-core)"></div>ACES Core</div>
+    <div class="leg"><div class="leg-sq" style="background:var(--aces-mcp)"></div>ACES MCP</div>
+    <div class="leg"><div class="leg-sq" style="background:var(--data)"></div>Data Plane</div>
+    <div class="leg"><div class="leg-sq" style="background:var(--integration)"></div>Integration</div>
+    <div class="leg"><div class="leg-sq" style="background:var(--obs)"></div>Observability</div>
+    <div class="leg"><div class="leg-sq" style="background:var(--security)"></div>Security</div>
+  </div>
+</div>
+
+<div class="scrollwrap">
+<div class="canvas">
+
+<!-- ══════════════════════════════════════
+     ROW 1: INTERACTION + SECURITY SIDE
+════════════════════════════════════════ -->
+<div style="display:grid;grid-template-columns:1fr 210px;gap:8px;">
+
+  <!-- INTERACTION LAYER -->
+  <div class="layer L-interaction">
+    <div class="layer-lbl">INTERACTION LAYER</div>
+    <div style="display:grid;grid-template-columns:160px 1fr;gap:10px;margin-top:6px;">
+      <!-- Users -->
+      <div>
+        <div class="section-title">USERS & ACCESS</div>
+        <div class="c-interaction" style="display:flex;flex-direction:column;gap:6px;">
+          <div class="mod">
+            <span class="mod-icon">👤</span>
+            <div class="mod-title">End Users</div>
+            <div class="mod-desc">Ask · Review · Approve</div>
+          </div>
+          <div class="mod">
+            <span class="mod-icon">🧑‍💼</span>
+            <div class="mod-title">Support Agents</div>
+            <div class="mod-desc">Human-in-the-loop</div>
+          </div>
+          <div class="mod">
+            <span class="mod-icon">💻</span>
+            <div class="mod-title">Developers / IDE</div>
+            <div class="mod-desc">Claude Desktop · Cursor · VS Code</div>
+          </div>
+          <div class="mod">
+            <span class="mod-icon">📊</span>
+            <div class="mod-title">ACES / Copilot UI</div>
+            <div class="mod-desc">Dashboards</div>
+          </div>
+        </div>
+      </div>
+      <!-- Channels -->
+      <div>
+        <div class="section-title">CHANNELS & ENTRY POINTS</div>
+        <div class="c-interaction g3" style="margin-bottom:8px;">
+          <div class="mod">
+            <span class="mod-icon">🌐</span>
+            <div class="mod-title">Web App</div>
+            <div class="mod-desc">Browser-based interface</div>
+          </div>
+          <div class="mod">
+            <span class="mod-icon">🤖</span>
+            <div class="mod-title">MCP Client</div>
+            <div class="mod-desc">Protocol-based access</div>
+          </div>
+          <div class="mod">
+            <span class="mod-icon">&lt;/&gt;</span>
+            <div class="mod-title">REST / SDK</div>
+            <div class="mod-desc">Programmatic access</div>
+          </div>
+          <div class="mod">
+            <span class="mod-icon">📟</span>
+            <div class="mod-title">CLI</div>
+            <div class="mod-desc">Command-line tool</div>
+          </div>
+          <div class="mod">
+            <span class="mod-icon">🔔</span>
+            <div class="mod-title">Slack / Teams</div>
+            <div class="mod-desc">Decision notifications</div>
+          </div>
+          <div class="mod">
+            <span class="mod-icon">🪝</span>
+            <div class="mod-title">CI/CD Webhook</div>
+            <div class="mod-desc">Pipeline trigger</div>
+          </div>
+        </div>
+        <div class="info-box">
+          <div class="info-box-title">ALL REQUESTS FLOW DOWN TO ARIA FIRST</div>
+          <div class="info-box-text">No request reaches ACES execution without passing through the ARIA governance layer. ARIA evaluates, decides, then hands off to ACES.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECURITY SIDE PANEL -->
+  <div style="display:flex;flex-direction:column;gap:8px;">
+    <div class="layer L-security" style="flex:1;">
+      <div class="layer-lbl">IDENTITY & ACCESS</div>
+      <div class="c-security" style="display:flex;flex-direction:column;gap:6px;margin-top:8px;">
+        <div class="mod">
+          <span class="mod-icon">🔐</span>
+          <div class="mod-title">OAuth 2.1 Auth Server</div>
+          <div class="mod-desc">WorkOS / Auth0 / Keycloak</div>
+          <div class="mod-sub">JWTs + Token Validation</div>
+        </div>
+        <div class="mod">
+          <span class="mod-icon">🛡</span>
+          <div class="mod-title">RLS Enforcement</div>
+          <div class="mod-desc">Oracle VPD + Row-Level Security</div>
+          <div class="oracle-badge">🔴 Oracle VPD</div>
+        </div>
+        <div class="mod">
+          <span class="mod-icon">🔑</span>
+          <div class="mod-title">Vault / KMS</div>
+          <div class="mod-desc">Per-tenant Keys & Secrets</div>
+          <div class="mod-sub">Secrets Injection</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CONNECTOR -->
+<div class="connector">
+  <div class="conn-line"></div>
+  <span>↓ ALL REQUESTS → ARIA GOVERNANCE FIRST ↓</span>
+  <div class="conn-line"></div>
+</div>
+
+<!-- ══════════════════════════════════════
+     ROW 2: ARIA GOVERNANCE LAYER ★ NEW
+════════════════════════════════════════ -->
+<div class="layer L-aria">
+  <div class="layer-lbl">★ GOVERNANCE LAYER — ARIA (ADAPTIVE RISK INTELLIGENCE FOR AI AGENTS) — CORRECTED & COMPLETE</div>
+
+  <div style="display:grid;grid-template-columns:1fr 220px;gap:12px;margin-top:10px;">
+    <div>
+
+      <!-- ARIA Decision Pipeline -->
+      <div class="section-title">ARIA DECISION PIPELINE — EVERY REQUEST PASSES THROUGH ALL 6 STAGES</div>
+      <div class="aria-pipeline">
+        <div class="ap">
+          <div class="ap-n">STAGE 1</div>
+          <div class="ap-t">Request Intake</div>
+          <div class="ap-d">PR payload, agent ID, files, services, tool results, environment</div>
+          <div class="ap-arr">→</div>
+        </div>
+        <div class="ap">
+          <div class="ap-n">STAGE 2</div>
+          <div class="ap-t">Agent DNA Load</div>
+          <div class="ap-d">Trust score, trend, history, last incident pulled from registry</div>
+          <div class="ap-arr">→</div>
+        </div>
+        <div class="ap">
+          <div class="ap-n">STAGE 3</div>
+          <div class="ap-t">Policy Plugins</div>
+          <div class="ap-d">All active policy plugins evaluate change context — PCI, auth, domain rules</div>
+          <div class="ap-arr">→</div>
+        </div>
+        <div class="ap">
+          <div class="ap-n">STAGE 4</div>
+          <div class="ap-t">Signal Aggregation</div>
+          <div class="ap-d">Snyk + Sonar + Raven + cost + blast radius weighted and normalized</div>
+          <div class="ap-arr">→</div>
+        </div>
+        <div class="ap">
+          <div class="ap-n">STAGE 5</div>
+          <div class="ap-t">Risk Scoring</div>
+          <div class="ap-d">Composite: criticality × tools × agent trust × environment × cost</div>
+          <div class="ap-arr">→</div>
+        </div>
+        <div class="ap">
+          <div class="ap-n">STAGE 6</div>
+          <div class="ap-t">Decision + Archaeology</div>
+          <div class="ap-d">Verdict stored with full reasoning, plain-English explanation, audit record</div>
+        </div>
+      </div>
+
+      <!-- ARIA Core Modules -->
+      <div class="section-title">ARIA CORE MODULES</div>
+      <div class="c-aria g4" style="margin-bottom:10px;">
+
+        <div class="mod">
+          <div class="badge-new">NEW</div>
+          <span class="mod-icon">🧬</span>
+          <div class="mod-title">Agent DNA Registry</div>
+          <div class="mod-desc">Persistent trust profile per AI agent. Updated on every deployment outcome. Auto-provisions new agents at trust 0.30.</div>
+          <div class="mod-sub">Oracle ADB · per-agent rows · VPD scoped</div>
+        </div>
+
+        <div class="mod">
+          <div class="badge-new">NEW</div>
+          <span class="mod-icon">⚡</span>
+          <div class="mod-title">Trust Score Engine</div>
+          <div class="mod-desc">Continuous score [0.10–1.00] per agent. Incident → −0.08. Clean deploy → +0.02. Bounded, time-decayed.</div>
+          <div class="mod-sub">5 bands: Critical / Low / Med / High / Elite</div>
+        </div>
+
+        <div class="mod">
+          <div class="badge-new">NEW</div>
+          <span class="mod-icon">🔍</span>
+          <div class="mod-title">Decision Archaeology</div>
+          <div class="mod-desc">Immutable audit log of every decision. Plain-English explanation. Full reasoning stored. Retroactively queryable.</div>
+          <div class="mod-sub">Oracle append-only · 7yr retention · SIEM feed</div>
+        </div>
+
+        <div class="mod">
+          <div class="badge-new">NEW</div>
+          <span class="mod-icon">🔁</span>
+          <div class="mod-title">Production Feedback Loop</div>
+          <div class="mod-desc">Post-deploy incidents, rollbacks, SLO breaches correlated to agent PRs. Trust scores update automatically within 5 min.</div>
+          <div class="mod-sub">PagerDuty + Datadog + Splunk → Oracle</div>
+        </div>
+
+        <div class="mod">
+          <div class="badge-new">NEW</div>
+          <span class="mod-icon">📋</span>
+          <div class="mod-title">Policy Plugin Engine</div>
+          <div class="mod-desc">Pluggable policy rules. PCI policy, auth-service policy, domain constraints. Each returns a verdict per change.</div>
+          <div class="mod-sub">YAML rules + Oracle policy store</div>
+        </div>
+
+        <div class="mod">
+          <div class="badge-new">NEW</div>
+          <span class="mod-icon">💰</span>
+          <div class="mod-title">Cost Intelligence</div>
+          <div class="mod-desc">Token cost, rework cost, pipeline cost tracked per agent. High cost + low trust → restrict. Feeds risk decisions.</div>
+          <div class="mod-sub">Oracle cost ledger · monthly budgets</div>
+        </div>
+
+        <div class="mod">
+          <span class="mod-icon">🚦</span>
+          <div class="mod-title">Approval Gate</div>
+          <div class="mod-desc">Redis-backed pending approvals. Human reviewer approves or rejects destructive ops. Dual-approval for critical.</div>
+          <div class="mod-sub">Redis · JIRA auto-ticket · Slack alert</div>
+        </div>
+
+        <div class="mod">
+          <span class="mod-icon">🧑‍⚖️</span>
+          <div class="mod-title">Human Reviewer</div>
+          <div class="mod-desc">Approves / rejects REQUIRES_APPROVAL decisions. Override logged with full context. Feeds ARIA calibration.</div>
+          <div class="mod-sub">Dashboard · mobile · audit trail</div>
+        </div>
+      </div>
+
+      <!-- Decision Outcomes -->
+      <div class="section-title">4 DECISION OUTCOMES (replaces binary pass/fail)</div>
+      <div class="decision-row">
+        <div class="dec" style="background:rgba(0,229,122,0.07);border:1px solid rgba(0,229,122,0.25);">
+          <span class="dec-icon">✓</span>
+          <div class="dec-l" style="color:#00e57a;">ALLOW</div>
+          <div class="dec-d">Low risk · high trust · all signals green</div>
+        </div>
+        <div class="dec" style="background:rgba(255,201,77,0.07);border:1px solid rgba(255,201,77,0.25);">
+          <span class="dec-icon">⚠</span>
+          <div class="dec-l" style="color:#ffc94d;">ALLOW + WARN</div>
+          <div class="dec-d">Caution warranted · proceeds with notice</div>
+        </div>
+        <div class="dec" style="background:rgba(255,140,66,0.07);border:1px solid rgba(255,140,66,0.25);">
+          <span class="dec-icon">◎</span>
+          <div class="dec-l" style="color:#ff8c42;">REQUIRES APPROVAL</div>
+          <div class="dec-d">Human judgment needed · gated</div>
+        </div>
+        <div class="dec" style="background:rgba(239,68,68,0.07);border:1px solid rgba(239,68,68,0.25);">
+          <span class="dec-icon">✕</span>
+          <div class="dec-l" style="color:#ef4444;">BLOCK</div>
+          <div class="dec-d">High risk · cannot proceed</div>
+        </div>
+      </div>
+
+      <!-- Trust Bands -->
+      <div class="section-title" style="margin-top:10px;">AGENT TRUST BANDS</div>
+      <div class="trust-row">
+        <div class="tb" style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);">
+          <div class="tb-l" style="color:#ef4444;">CRITICAL</div>
+          <div class="tb-v" style="color:#ef4444;">0.10–0.39</div>
+          <div style="font-size:7.5px;color:var(--muted);margin-top:2px;">Max: REQUIRES APPROVAL</div>
+        </div>
+        <div class="tb" style="background:rgba(255,140,66,0.08);border:1px solid rgba(255,140,66,0.2);">
+          <div class="tb-l" style="color:#ff8c42;">LOW</div>
+          <div class="tb-v" style="color:#ff8c42;">0.40–0.59</div>
+          <div style="font-size:7.5px;color:var(--muted);margin-top:2px;">Elevated risk factor</div>
+        </div>
+        <div class="tb" style="background:rgba(255,201,77,0.08);border:1px solid rgba(255,201,77,0.2);">
+          <div class="tb-l" style="color:#ffc94d;">MEDIUM</div>
+          <div class="tb-v" style="color:#ffc94d;">0.60–0.79</div>
+          <div style="font-size:7.5px;color:var(--muted);margin-top:2px;">Standard scoring</div>
+        </div>
+        <div class="tb" style="background:rgba(0,229,122,0.08);border:1px solid rgba(0,229,122,0.2);">
+          <div class="tb-l" style="color:#00e57a;">HIGH</div>
+          <div class="tb-v" style="color:#00e57a;">0.80–0.94</div>
+          <div style="font-size:7.5px;color:var(--muted);margin-top:2px;">Reduced risk factor</div>
+        </div>
+        <div class="tb" style="background:rgba(0,200,255,0.08);border:1px solid rgba(0,200,255,0.2);">
+          <div class="tb-l" style="color:var(--aria);">ELITE</div>
+          <div class="tb-v" style="color:var(--aria);">0.95–1.00</div>
+          <div style="font-size:7.5px;color:var(--muted);margin-top:2px;">Minimal risk addition</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ARIA RIGHT SIDE: LLM Providers + Plugin Registry -->
+    <div style="display:flex;flex-direction:column;gap:8px;">
+
+      <!-- LLM Providers -->
+      <div class="layer L-security" style="padding:10px 12px;">
+        <div class="layer-lbl">LLM PROVIDERS</div>
+        <div class="c-security" style="display:flex;flex-direction:column;gap:5px;margin-top:8px;">
+          <div class="mod" style="padding:7px 10px;">
+            <div class="mod-title">🟢 OpenAI</div>
+            <div class="mod-desc">GPT-4o · GPT-4 Turbo</div>
+          </div>
+          <div class="mod" style="padding:7px 10px;">
+            <div class="mod-title">🔵 Anthropic</div>
+            <div class="mod-desc">Claude Sonnet · Claude Opus</div>
+          </div>
+          <div class="mod" style="padding:7px 10px;">
+            <div class="mod-title">🟦 Azure OpenAI</div>
+            <div class="mod-desc">Enterprise endpoints</div>
+          </div>
+          <div class="mod" style="padding:7px 10px;">
+            <div class="mod-title">⚪ Others</div>
+            <div class="mod-desc">Pluggable via interface</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Plugin Registry -->
+      <div class="c-aria" style="flex:1;">
+        <div class="mod" style="height:100%;">
+          <div class="badge-new">NEW</div>
+          <span class="mod-icon">🔌</span>
+          <div class="mod-title">Plugin Registry</div>
+          <div class="mod-desc" style="margin-bottom:6px;">Every capability — agent, tool, policy, feedback source — registered here. ARIA auto-discovers within 60s.</div>
+          <div style="display:flex;flex-direction:column;gap:3px;">
+            <div class="arrow-label" style="font-size:8px;">execution/agent plugins</div>
+            <div class="arrow-label" style="font-size:8px;">governance/policy plugins</div>
+            <div class="arrow-label" style="font-size:8px;">governance/feedback plugins</div>
+            <div class="arrow-label" style="font-size:8px;">integration/scanner plugins</div>
+            <div class="arrow-label" style="font-size:8px;">interaction/notification plugins</div>
+          </div>
+          <div class="mod-sub" style="margin-top:6px;">Oracle plugin store · versioned contracts</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- CONNECTOR -->
+<div class="connector">
+  <div class="conn-line"></div>
+  <span>↓ ONLY AFTER ARIA DECISION: ALLOW or ALLOW+WARN → ACES EXECUTES ↓</span>
+  <div class="conn-line"></div>
+</div>
+
+<!-- ══════════════════════════════════════
+     ROW 3: ACES CORE — AGENTIC ORCHESTRATION
+════════════════════════════════════════ -->
+<div class="layer L-aces-core">
+  <div class="layer-lbl">ACES CORE — AGENTIC ORCHESTRATION</div>
+
+  <!-- Orchestration Loop -->
+  <div class="section-title" style="margin-top:8px;">AGENTIC LOOP — ONE REVISE CYCLE WITH CRITIC GATE</div>
+  <div class="orch-flow">
+    <div class="of">
+      <span class="of-icon">📋</span>
+      <div class="of-name">Planner</div>
+      <div class="of-desc">Emits retrieval plan (JSON)</div>
+    </div>
+    <div class="of-arr">→</div>
+    <div class="of">
+      <span class="of-icon">🎯</span>
+      <div class="of-name">Orchestrator</div>
+      <div class="of-desc">One Revise Loop · bounded tool calls</div>
+    </div>
+    <div class="of-arr">→</div>
+    <div class="of">
+      <span class="of-icon">🔍</span>
+      <div class="of-name">Retriever</div>
+      <div class="of-desc">Bounded tool loop · 6 iter cap</div>
+    </div>
+    <div class="of-arr">→</div>
+    <div class="of">
+      <span class="of-icon">✍️</span>
+      <div class="of-name">Synthesizer</div>
+      <div class="of-desc">Drafts reply with citations [S1][S2]</div>
+    </div>
+    <div class="of-arr">→</div>
+    <div class="of">
+      <span class="of-icon">🧐</span>
+      <div class="of-name">Critic</div>
+      <div class="of-desc">Approves or sends back for revision</div>
+    </div>
+    <div class="of-arr">→</div>
+    <div class="of">
+      <span class="of-icon">📤</span>
+      <div class="of-name">Result / Error</div>
+      <div class="of-desc">Final output + ARIA execution record</div>
+    </div>
+  </div>
+
+  <!-- ACES Core Modules -->
+  <div class="c-aces-core g4">
+    <div class="mod">
+      <span class="mod-icon">🧠</span>
+      <div class="mod-title">Memory</div>
+      <div class="mod-desc">STM in Redis · LTM via Vector DB (Qdrant)</div>
+      <div class="mod-sub">Tenant-scoped · TTL managed</div>
+    </div>
+    <div class="mod">
+      <span class="mod-icon">🔄</span>
+      <div class="mod-title">Agent Runtime</div>
+      <div class="mod-desc">Routes execution to registered agent plugins. Injects ARIA trust context into every call.</div>
+      <div class="mod-sub">ARIA context passthrough mandatory</div>
+    </div>
+    <div class="mod">
+      <span class="mod-icon">⚙️</span>
+      <div class="mod-title">Workflow Engine</div>
+      <div class="mod-desc">Multi-step tool orchestration · sub-workflows · conditional branching</div>
+      <div class="mod-sub">Each step re-evaluated by ARIA</div>
+    </div>
+    <div class="mod">
+      <span class="mod-icon">📦</span>
+      <div class="mod-title">Context Store</div>
+      <div class="mod-desc">Conversation state · session memory · agent reasoning history</div>
+      <div class="mod-sub">Oracle ADB + Redis L1 cache</div>
+    </div>
+  </div>
+</div>
+
+<!-- CONNECTOR -->
+<div class="connector">
+  <div class="conn-line"></div>
+  <span>↓ ACES CORE → ACES MCP DISPATCH ↓</span>
+  <div class="conn-line"></div>
+</div>
+
+<!-- ══════════════════════════════════════
+     ROW 4: ACES MCP SERVER
+════════════════════════════════════════ -->
+<div class="layer L-aces-mcp">
+  <div class="layer-lbl">ACES MCP SERVER — CONTROL & DISPATCH PIPELINE</div>
+
+  <div class="mcp-layout" style="margin-top:10px;">
+
+    <!-- LEFT: Security & Rate Controls -->
+    <div class="mcp-col">
+      <div class="section-title">SECURITY & RATE CONTROLS</div>
+      <div class="c-aces-mcp" style="display:flex;flex-direction:column;gap:6px;">
+        <div class="mod">
+          <span class="mod-icon">🔒</span>
+          <div class="mod-title">Auth Middleware</div>
+          <div class="mod-desc">OAuth 2.1 + JWT + JWKS</div>
+          <div class="mod-sub">Validates every inbound call</div>
+        </div>
+        <div class="mod">
+          <span class="mod-icon">⚖️</span>
+          <div class="mod-title">Policy Engine (MCP)</div>
+          <div class="mod-desc">YAML Rules · Deny-by-Default</div>
+          <div class="mod-sub">Tool-level enforcement</div>
+        </div>
+        <div class="mod">
+          <span class="mod-icon">✅</span>
+          <div class="mod-title">Validation</div>
+          <div class="mod-desc">Pydantic Schemas · Selective</div>
+          <div class="mod-sub">Input/output schema enforcement</div>
+        </div>
+        <div class="mod">
+          <span class="mod-icon">🏢</span>
+          <div class="mod-title">Tenant Guard</div>
+          <div class="mod-desc">Per-tenant isolation</div>
+          <div class="mod-sub">Namespace + Oracle VPD</div>
+        </div>
+        <div class="mod">
+          <span class="mod-icon">🔄</span>
+          <div class="mod-title">Retry + ATBA</div>
+          <div class="mod-desc">Jitter Backoff · Turn Budget Allocator</div>
+          <div class="mod-sub">JSON-RPC 2.0</div>
+        </div>
+        <div class="mod">
+          <span class="mod-icon">🚦</span>
+          <div class="mod-title">Rate Limiter</div>
+          <div class="mod-desc">Redis Token Bucket</div>
+          <div class="mod-sub">Per Tenant, Per Tool</div>
+        </div>
+        <div class="mod">
+          <span class="mod-icon">⚡</span>
+          <div class="mod-title">Circuit Breaker</div>
+          <div class="mod-desc">Closed → Half-open → Open</div>
+          <div class="mod-sub">Per downstream tool</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CENTER: Tool Execution Engine -->
+    <div>
+      <div class="section-title" style="text-align:center;">TOOL EXECUTION ENGINE</div>
+      <div class="tool-engine" style="margin-bottom:8px;">
+        <div class="te-t">Tool Execution Engine</div>
+        <div class="te-s">Atomic · Composed · Workflow</div>
+        <div class="te-tags">
+          <span class="te-tag">JSON-RPC 2.0</span>
+          <span class="te-tag">Atomic calls</span>
+          <span class="te-tag">Composed flows</span>
+          <span class="te-tag">Sub-workflows</span>
+          <span class="te-tag">ARIA reports every invocation</span>
+        </div>
+      </div>
+      <div class="c-aces-mcp g3">
+        <div class="mod">
+          <span class="mod-icon">💾</span>
+          <div class="mod-title">Cache Manager</div>
+          <div class="mod-desc">L1 In-process + L2 Redis</div>
+          <div class="mod-sub">Per-tool TTL policies</div>
+        </div>
+        <div class="mod">
+          <span class="mod-icon">🔀</span>
+          <div class="mod-title">Workflow Engine</div>
+          <div class="mod-desc">Multi-step Tools & Sub-workflows</div>
+          <div class="mod-sub">DAG-based execution</div>
+        </div>
+        <div class="mod">
+          <span class="mod-icon">🔏</span>
+          <div class="mod-title">NX Lock Manager</div>
+          <div class="mod-desc">Prevents Thundering Herd</div>
+          <div class="mod-sub">Distributed lock · Redis</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Registry & Audit -->
+    <div class="mcp-col">
+      <div class="section-title">REGISTRY & AUDIT</div>
+      <div class="c-aces-mcp" style="display:flex;flex-direction:column;gap:6px;">
+        <div class="mod">
+          <span class="mod-icon">📚</span>
+          <div class="mod-title">Tool Registry</div>
+          <div class="mod-desc">Versioned Tools & Schemas</div>
+          <div class="mod-sub">Oracle tool catalog · semver</div>
+        </div>
+        <div class="mod">
+          <span class="mod-icon">📝</span>
+          <div class="mod-title">Audit Logger</div>
+          <div class="mod-desc">Tool Calls · Payloads · Results</div>
+          <div class="mod-sub">Oracle append-only · SIEM</div>
+        </div>
+        <div class="mod">
+          <span class="mod-icon">🔌</span>
+          <div class="mod-title">Plugin Executor</div>
+          <div class="mod-desc">Routes to registered execution plugins — agents, MCP servers, tools</div>
+          <div class="mod-sub">Conforms to plugin contract</div>
+        </div>
+        <div class="mod">
+          <span class="mod-icon">📡</span>
+          <div class="mod-title">ARIA Reporter</div>
+          <div class="mod-desc">Posts every execution record back to ARIA for audit and trust update</div>
+          <div class="mod-sub">Async · non-blocking · guaranteed</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CONNECTOR -->
+<div class="connector">
+  <div class="conn-line"></div>
+  <span>↓ ACES MCP → DATA PLANE + INTEGRATION ↓</span>
+  <div class="conn-line"></div>
+</div>
+
+<!-- ══════════════════════════════════════
+     ROW 5: DATA PLANE + INTEGRATION (SIDE BY SIDE)
+════════════════════════════════════════ -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+
+  <!-- DATA PLANE -->
+  <div class="layer L-data">
+    <div class="layer-lbl">DATA PLANE — TENANT ISOLATED BACKENDS</div>
+    <div class="c-data g3" style="margin-top:10px;">
+      <div class="mod">
+        <span class="mod-icon">🔴</span>
+        <div class="mod-title">Oracle Autonomous DB</div>
+        <div class="mod-desc">Primary relational store. VPD Row-Level Security. Per-tenant isolation.</div>
+        <div class="oracle-badge">🔴 Oracle ADB · VPD</div>
+      </div>
+      <div class="mod">
+        <span class="mod-icon">🔵</span>
+        <div class="mod-title">Elasticsearch</div>
+        <div class="mod-desc">Full-text search · BM25 + Tenant Filter</div>
+        <div class="mod-sub">Tenant-namespaced indices</div>
+      </div>
+      <div class="mod">
+        <span class="mod-icon">🟣</span>
+        <div class="mod-title">Qdrant</div>
+        <div class="mod-desc">Vector Search · Tenant Scoped</div>
+        <div class="mod-sub">Embeddings + semantic retrieval</div>
+      </div>
+      <div class="mod">
+        <span class="mod-icon">🟠</span>
+        <div class="mod-title">MinIO / S3</div>
+        <div class="mod-desc">Object storage · Tenant Prefix Keys</div>
+        <div class="mod-sub">Files, docs, artifacts</div>
+      </div>
+      <div class="mod">
+        <span class="mod-icon">🔴</span>
+        <div class="mod-title">Oracle ARIA Store</div>
+        <div class="mod-desc">Agent trust profiles · Decision events · Plugin registry · Audit log</div>
+        <div class="oracle-badge">🔴 ARIA-dedicated schema</div>
+      </div>
+      <div class="mod">
+        <span class="mod-icon">⚡</span>
+        <div class="mod-title">Redis Cluster</div>
+        <div class="mod-desc">Token buckets · Session cache · Pending approvals · L1/L2 cache</div>
+        <div class="mod-sub">Per-tenant namespacing</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- INTEGRATION -->
+  <div class="layer L-integration">
+    <div class="layer-lbl">EXTERNAL SYSTEMS & INTEGRATIONS</div>
+    <div class="c-integration g3" style="margin-top:10px;">
+      <div class="mod">
+        <span class="mod-icon">🔌</span>
+        <div class="mod-title">Internal APIs</div>
+        <div class="mod-desc">Internal service mesh · REST + gRPC</div>
+      </div>
+      <div class="mod">
+        <span class="mod-icon">🎫</span>
+        <div class="mod-title">CRMs / ITSM</div>
+        <div class="mod-desc">Salesforce · ServiceNow · JIRA</div>
+      </div>
+      <div class="mod">
+        <span class="mod-icon">🗄️</span>
+        <div class="mod-title">Databases</div>
+        <div class="mod-desc">Oracle · legacy systems · read replicas</div>
+        <div class="oracle-badge">🔴 Oracle primary</div>
+      </div>
+      <div class="mod">
+        <span class="mod-icon">📚</span>
+        <div class="mod-title">Knowledge Bases</div>
+        <div class="mod-desc">Confluence · SharePoint · internal wikis</div>
+      </div>
+      <div class="mod">
+        <span class="mod-icon">✉️</span>
+        <div class="mod-title">Email / Chat</div>
+        <div class="mod-desc">Outlook · Slack · Teams notifications</div>
+      </div>
+      <div class="mod">
+        <span class="mod-icon">📁</span>
+        <div class="mod-title">Files / Docs</div>
+        <div class="mod-desc">SharePoint · OneDrive · internal DMS</div>
+      </div>
+      <div class="mod">
+        <div class="badge-new">ARIA</div>
+        <span class="mod-icon">🔒</span>
+        <div class="mod-title">Snyk / Sonar / Raven</div>
+        <div class="mod-desc">Security + quality scanners. Results fed to ARIA signal aggregator.</div>
+        <div class="mod-sub">integration/scanner plugins</div>
+      </div>
+      <div class="mod">
+        <div class="badge-new">ARIA</div>
+        <span class="mod-icon">🚨</span>
+        <div class="mod-title">PagerDuty / Datadog</div>
+        <div class="mod-desc">Incident events → ARIA feedback loop → trust score updates</div>
+        <div class="mod-sub">governance/feedback plugins</div>
+      </div>
+      <div class="mod">
+        <span class="mod-icon">🌐</span>
+        <div class="mod-title">3rd Party APIs</div>
+        <div class="mod-desc">Outbound HTTP · per-tenant allowlist</div>
+        <div class="mod-sub">Outbound HTTP allowlist enforced</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- CONNECTOR -->
+<div class="connector">
+  <div class="conn-line"></div>
+  <span>↓ FULL STACK OBSERVABILITY — ONE TRACE ID ACROSS EVERYTHING ↓</span>
+  <div class="conn-line"></div>
+</div>
+
+<!-- ══════════════════════════════════════
+     ROW 6: OBSERVABILITY
+════════════════════════════════════════ -->
+<div class="layer L-obs">
+  <div class="layer-lbl">OBSERVABILITY — ONE TRACE ID ACROSS EVERYTHING (ARIA + ACES)</div>
+  <div class="c-obs g7" style="margin-top:10px;">
+    <div class="mod">
+      <span class="mod-icon">📡</span>
+      <div class="mod-title">OpenTelemetry</div>
+      <div class="mod-desc">Spans per Tool Call · Traces · Metrics · Logs</div>
+    </div>
+    <div class="mod">
+      <span class="mod-icon">🔭</span>
+      <div class="mod-title">Jaeger</div>
+      <div class="mod-desc">Trace Viewer · end-to-end request tracing</div>
+    </div>
+    <div class="mod">
+      <span class="mod-icon">📊</span>
+      <div class="mod-title">Prometheus</div>
+      <div class="mod-desc">Metrics Scraper · SLO tracking</div>
+    </div>
+    <div class="mod">
+      <span class="mod-icon">📈</span>
+      <div class="mod-title">Grafana</div>
+      <div class="mod-desc">Dashboards + Alerts · ARIA + ACES panels</div>
+    </div>
+    <div class="mod">
+      <span class="mod-icon">📋</span>
+      <div class="mod-title">Audit Log (JSONL)</div>
+      <div class="mod-desc">Shipped to SIEM · Oracle append-only · 7yr retention</div>
+      <div class="oracle-badge">🔴 Oracle JSONL store</div>
+    </div>
+    <div class="mod">
+      <div class="badge-new">NEW</div>
+      <span class="mod-icon">🧬</span>
+      <div class="mod-title">ARIA Analytics</div>
+      <div class="mod-desc">Agent trust trends · Decision distribution · Cost · Feedback quality</div>
+    </div>
+    <div class="mod">
+      <span class="mod-icon">⚙️</span>
+      <div class="mod-title">ACES Admin Console</div>
+      <div class="mod-desc">Tenants · Tools · Policies · Usage · Configs · Plugin registry</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     ROW 7: PLATFORM FEATURES
+════════════════════════════════════════ -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+
+  <!-- ACES Platform Features -->
+  <div class="layer" style="border-color:var(--border2);background:var(--s0);padding:14px 16px;">
+    <div class="layer-lbl" style="background:var(--dim);color:var(--muted);border:1px solid var(--border);">ACES PLATFORM FEATURES</div>
+    <div class="g3" style="margin-top:10px;">
+      <div class="feat-list">
+        <div class="feat-item">Multi-tenancy by Design</div>
+        <div class="feat-item">End-to-end Encryption</div>
+        <div class="feat-item">RBAC + ABAC</div>
+      </div>
+      <div class="feat-list">
+        <div class="feat-item">Audit & Compliance Ready</div>
+        <div class="feat-item">SLA · Quotas · Budgets</div>
+        <div class="feat-item">Backup & DR Ready</div>
+      </div>
+      <div class="feat-list">
+        <div class="feat-item">Cost & Token Governance</div>
+        <div class="feat-item">Extensible Plugin Framework</div>
+        <div class="feat-item">Oracle VPD Row Security</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ARIA Platform Features -->
+  <div class="layer" style="border-color:rgba(0,200,255,0.3);background:rgba(0,200,255,0.02);padding:14px 16px;">
+    <div class="layer-lbl" style="background:rgba(0,200,255,0.12);color:var(--aria);border:1px solid rgba(0,200,255,0.3);">★ ARIA GOVERNANCE FEATURES — NEW</div>
+    <div class="g3" style="margin-top:10px;">
+      <div class="feat-list">
+        <div class="feat-item" style="color:var(--aria);">Agent DNA Trust Profiles</div>
+        <div class="feat-item" style="color:var(--aria);">Adaptive Risk Scoring</div>
+        <div class="feat-item" style="color:var(--aria);">Decision Archaeology</div>
+      </div>
+      <div class="feat-list">
+        <div class="feat-item" style="color:var(--aria);">Production Feedback Loop</div>
+        <div class="feat-item" style="color:var(--aria);">4 Decision Outcomes</div>
+        <div class="feat-item" style="color:var(--aria);">Plain-English Explainability</div>
+      </div>
+      <div class="feat-list">
+        <div class="feat-item" style="color:var(--aria);">Plugin Contract System</div>
+        <div class="feat-item" style="color:var(--aria);">Cost Intelligence Module</div>
+        <div class="feat-item" style="color:var(--aria);">Oracle ARIA Dedicated Schema</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══════════════════════════════════════
+     LEGEND / FLOW KEY
+════════════════════════════════════════ -->
+<div style="background:var(--s0);border:1px solid var(--border);border-radius:8px;padding:12px 16px;">
+  <div style="display:flex;align-items:center;gap:32px;flex-wrap:wrap;">
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:1px;font-weight:600;">FLOW KEY</div>
+    <div class="leg"><span style="color:var(--text);margin-right:4px;">——→</span>Synchronous Call</div>
+    <div class="leg"><span style="color:var(--muted);margin-right:4px;">- - →</span>Async / Event</div>
+    <div class="leg"><span style="color:var(--aria);margin-right:4px;">····→</span>Policy / Control (ARIA)</div>
+    <div class="leg"><span style="color:var(--obs);margin-right:4px;">-·-·→</span>Observability / Telemetry</div>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:6px;">
+      <div style="width:8px;height:8px;background:rgba(0,200,255,0.3);border-radius:2px;"></div>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--aria);">★ NEW = Added to correct original diagram</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;">
+      <div class="oracle-badge" style="margin:0;">🔴 Oracle</div>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--muted);">= Oracle replaces PostgreSQL throughout</span>
+    </div>
+  </div>
+</div>
+
+</div><!-- /canvas -->
+</div><!-- /scrollwrap -->
+
+</body>
+</html>
