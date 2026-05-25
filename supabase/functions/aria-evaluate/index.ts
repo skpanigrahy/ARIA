@@ -4,12 +4,18 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
+  "Access-Control-Allow-Headers":
+    "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
 interface ToolSignalInput {
   snyk?: { status: string; criticalCount?: number; highCount?: number };
-  sonar?: { status: string; bugs?: number; vulnerabilities?: number; codeSmells?: number };
+  sonar?: {
+    status: string;
+    bugs?: number;
+    vulnerabilities?: number;
+    codeSmells?: number;
+  };
   raven?: { status: string; violations?: string[] };
 }
 
@@ -26,10 +32,10 @@ interface EvaluateRequest {
 }
 
 const CRITICALITY_WEIGHTS: Record<string, number> = {
-  LOW: 0.20,
+  LOW: 0.2,
   MEDIUM: 0.45,
   HIGH: 0.72,
-  CRITICAL: 1.00,
+  CRITICAL: 1.0,
 };
 
 function computeToolRisk(signals: ToolSignalInput): number {
@@ -43,7 +49,8 @@ function computeToolRisk(signals: ToolSignalInput): number {
     else if (s.status === "HIGH") snykScore = 0.75;
     else if (s.status === "MEDIUM") snykScore = 0.45;
     else snykScore = 0.05;
-    if (s.criticalCount && s.criticalCount > 0) snykScore = Math.max(snykScore, 0.9);
+    if (s.criticalCount && s.criticalCount > 0)
+      snykScore = Math.max(snykScore, 0.9);
     if (s.highCount && s.highCount > 2) snykScore = Math.max(snykScore, 0.7);
   } else {
     snykScore = 0.3;
@@ -54,7 +61,8 @@ function computeToolRisk(signals: ToolSignalInput): number {
     if (s.status === "FAILED" || s.status === "ERROR") sonarScore = 0.8;
     else if (s.status === "WARN") sonarScore = 0.45;
     else sonarScore = 0.05;
-    if (s.vulnerabilities && s.vulnerabilities > 0) sonarScore = Math.max(sonarScore, 0.7);
+    if (s.vulnerabilities && s.vulnerabilities > 0)
+      sonarScore = Math.max(sonarScore, 0.7);
     if (s.bugs && s.bugs > 3) sonarScore = Math.max(sonarScore, 0.5);
   } else {
     sonarScore = 0.3;
@@ -65,12 +73,13 @@ function computeToolRisk(signals: ToolSignalInput): number {
     if (s.status === "VIOLATION") ravenScore = 1.0;
     else if (s.status === "WARN") ravenScore = 0.55;
     else ravenScore = 0.05;
-    if (s.violations && s.violations.length > 0) ravenScore = Math.max(ravenScore, 0.85);
+    if (s.violations && s.violations.length > 0)
+      ravenScore = Math.max(ravenScore, 0.85);
   } else {
     ravenScore = 0.25;
   }
 
-  return snykScore * 0.45 + sonarScore * 0.25 + ravenScore * 0.30;
+  return snykScore * 0.45 + sonarScore * 0.25 + ravenScore * 0.3;
 }
 
 function generateReasoning(
@@ -82,43 +91,71 @@ function generateReasoning(
   overallRisk: number,
   criticality: string,
   signals: ToolSignalInput,
-  decision: string
+  decision: string,
 ): string {
   const parts: string[] = [];
 
   if (agentRisk > 0.6) {
-    parts.push(`${agentName} has a low trust score of ${Math.round(trustScore * 100)}%, indicating a history of incidents or insufficient track record.`);
+    parts.push(
+      `${agentName} has a low trust score of ${Math.round(trustScore * 100)}%, indicating a history of incidents or insufficient track record.`,
+    );
   } else if (agentRisk > 0.3) {
-    parts.push(`${agentName} has a moderate trust score of ${Math.round(trustScore * 100)}%, showing generally reliable behavior with some past issues.`);
+    parts.push(
+      `${agentName} has a moderate trust score of ${Math.round(trustScore * 100)}%, showing generally reliable behavior with some past issues.`,
+    );
   } else {
-    parts.push(`${agentName} has a strong trust score of ${Math.round(trustScore * 100)}%, demonstrating consistent reliability.`);
+    parts.push(
+      `${agentName} has a strong trust score of ${Math.round(trustScore * 100)}%, demonstrating consistent reliability.`,
+    );
   }
 
-  if (signals.snyk && (signals.snyk.status === "CRITICAL" || signals.snyk.status === "HIGH")) {
-    parts.push(`Snyk detected ${signals.snyk.status.toLowerCase()} severity vulnerabilities in the dependency tree.`);
+  if (
+    signals.snyk &&
+    (signals.snyk.status === "CRITICAL" || signals.snyk.status === "HIGH")
+  ) {
+    parts.push(
+      `Snyk detected ${signals.snyk.status.toLowerCase()} severity vulnerabilities in the dependency tree.`,
+    );
   }
-  if (signals.sonar && (signals.sonar.status === "FAILED" || signals.sonar.status === "ERROR")) {
+  if (
+    signals.sonar &&
+    (signals.sonar.status === "FAILED" || signals.sonar.status === "ERROR")
+  ) {
     parts.push(`SonarQube quality gate failed with code quality violations.`);
   }
   if (signals.raven && signals.raven.status === "VIOLATION") {
-    parts.push(`Raven policy engine detected compliance violations: ${signals.raven.violations?.join(", ") || "policy breach"}.`);
+    parts.push(
+      `Raven policy engine detected compliance violations: ${signals.raven.violations?.join(", ") || "policy breach"}.`,
+    );
   }
 
   if (criticality === "CRITICAL" || criticality === "HIGH") {
-    parts.push(`The target service is rated ${criticality.toLowerCase()} criticality, requiring elevated scrutiny.`);
+    parts.push(
+      `The target service is rated ${criticality.toLowerCase()} criticality, requiring elevated scrutiny.`,
+    );
   }
 
-  parts.push(`Overall risk score: ${Math.round(overallRisk * 100)}/100. Decision: ${decision}.`);
+  parts.push(
+    `Overall risk score: ${Math.round(overallRisk * 100)}/100. Decision: ${decision}.`,
+  );
   return parts.join(" ");
 }
 
-function generateRecommendation(decision: string, agentName: string, toolSignals: ToolSignalInput): string {
+function generateRecommendation(
+  decision: string,
+  agentName: string,
+  toolSignals: ToolSignalInput,
+): string {
   if (decision === "BLOCK") {
     const issues: string[] = [];
-    if (toolSignals.snyk && toolSignals.snyk.status !== "CLEAN") issues.push("resolve Snyk vulnerabilities");
-    if (toolSignals.sonar && toolSignals.sonar.status !== "OK") issues.push("fix SonarQube quality gate failures");
-    if (toolSignals.raven && toolSignals.raven.status === "VIOLATION") issues.push("remediate Raven policy violations");
-    const issueStr = issues.length > 0 ? ` Specifically: ${issues.join(", ")}.` : "";
+    if (toolSignals.snyk && toolSignals.snyk.status !== "CLEAN")
+      issues.push("resolve Snyk vulnerabilities");
+    if (toolSignals.sonar && toolSignals.sonar.status !== "OK")
+      issues.push("fix SonarQube quality gate failures");
+    if (toolSignals.raven && toolSignals.raven.status === "VIOLATION")
+      issues.push("remediate Raven policy violations");
+    const issueStr =
+      issues.length > 0 ? ` Specifically: ${issues.join(", ")}.` : "";
     return `This PR is blocked from deployment.${issueStr} A security review and manual approval from the platform engineering team is required before proceeding.`;
   }
   if (decision === "REVIEW") {
@@ -145,13 +182,29 @@ Deno.serve(async (req: Request) => {
     }
 
     const body: EvaluateRequest = await req.json();
-    const { agentId, serviceName, criticality, prTitle, prRepo, prNumber, filesChanged, linesChanged, toolSignals } = body;
+    const {
+      agentId,
+      serviceName,
+      criticality,
+      prTitle,
+      prRepo,
+      prNumber,
+      filesChanged,
+      linesChanged,
+      toolSignals,
+    } = body;
 
     if (!agentId || !serviceName || !criticality || !prTitle) {
-      return new Response(JSON.stringify({ error: "Missing required fields: agentId, serviceName, criticality, prTitle" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({
+          error:
+            "Missing required fields: agentId, serviceName, criticality, prTitle",
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
     }
 
     const { data: agent, error: agentError } = await supabase
@@ -161,17 +214,24 @@ Deno.serve(async (req: Request) => {
       .maybeSingle();
 
     if (agentError || !agent) {
-      return new Response(JSON.stringify({ error: "Agent not found", details: agentError?.message }), {
-        status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({
+          error: "Agent not found",
+          details: agentError?.message,
+        }),
+        {
+          status: 404,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
     }
 
     const signals = toolSignals || {};
     const agentRisk = 1 - agent.trust_score;
     const toolRisk = computeToolRisk(signals);
     const criticalityRisk = CRITICALITY_WEIGHTS[criticality] ?? 0.45;
-    const overallRisk = agentRisk * 0.38 + toolRisk * 0.42 + criticalityRisk * 0.20;
+    const overallRisk =
+      agentRisk * 0.38 + toolRisk * 0.42 + criticalityRisk * 0.2;
     const confidence = 0.72 + Math.random() * 0.18;
 
     let decision: string;
@@ -180,19 +240,45 @@ Deno.serve(async (req: Request) => {
     else decision = "ALLOW";
 
     const snykSignal = signals.snyk
-      ? { status: signals.snyk.status, critical_count: signals.snyk.criticalCount ?? 0, high_count: signals.snyk.highCount ?? 0 }
+      ? {
+          status: signals.snyk.status,
+          critical_count: signals.snyk.criticalCount ?? 0,
+          high_count: signals.snyk.highCount ?? 0,
+        }
       : { status: "PENDING", critical_count: 0, high_count: 0 };
 
     const sonarSignal = signals.sonar
-      ? { status: signals.sonar.status, bugs: signals.sonar.bugs ?? 0, vulnerabilities: signals.sonar.vulnerabilities ?? 0, code_smells: signals.sonar.codeSmells ?? 0 }
+      ? {
+          status: signals.sonar.status,
+          bugs: signals.sonar.bugs ?? 0,
+          vulnerabilities: signals.sonar.vulnerabilities ?? 0,
+          code_smells: signals.sonar.codeSmells ?? 0,
+        }
       : { status: "PENDING", bugs: 0, vulnerabilities: 0, code_smells: 0 };
 
     const ravenSignal = signals.raven
-      ? { status: signals.raven.status, violations: signals.raven.violations ?? [] }
+      ? {
+          status: signals.raven.status,
+          violations: signals.raven.violations ?? [],
+        }
       : { status: "PENDING", violations: [] };
 
-    const reasoning = generateReasoning(agent.name, agent.trust_score, agentRisk, toolRisk, criticalityRisk, overallRisk, criticality, signals, decision);
-    const recommendation = generateRecommendation(decision, agent.name, signals);
+    const reasoning = generateReasoning(
+      agent.name,
+      agent.trust_score,
+      agentRisk,
+      toolRisk,
+      criticalityRisk,
+      overallRisk,
+      criticality,
+      signals,
+      decision,
+    );
+    const recommendation = generateRecommendation(
+      decision,
+      agent.name,
+      signals,
+    );
 
     const { data: saved, error: saveError } = await supabase
       .from("decisions")
@@ -262,13 +348,16 @@ Deno.serve(async (req: Request) => {
       {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      },
     );
   } catch (err) {
     console.error("aria-evaluate error:", err);
-    return new Response(JSON.stringify({ error: "Internal server error", details: String(err) }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({ error: "Internal server error", details: String(err) }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
+    );
   }
 });

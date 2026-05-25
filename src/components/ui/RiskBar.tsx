@@ -5,18 +5,22 @@ interface RiskBarProps {
 }
 
 function getRiskColor(value: number): string {
-  if (value >= 0.68) return '#F85149';
-  if (value >= 0.38) return '#E3B341';
-  return '#3FB950';
+  if (value >= 0.68) return "#F85149";
+  if (value >= 0.38) return "#E3B341";
+  return "#3FB950";
 }
 
 function getRiskLabel(value: number): string {
-  if (value >= 0.68) return 'HIGH';
-  if (value >= 0.38) return 'MEDIUM';
-  return 'LOW';
+  if (value >= 0.68) return "HIGH";
+  if (value >= 0.38) return "MEDIUM";
+  return "LOW";
 }
 
-export default function RiskBar({ label, value, className = '' }: RiskBarProps) {
+export default function RiskBar({
+  label,
+  value,
+  className = "",
+}: RiskBarProps) {
   const color = getRiskColor(value);
   const riskLabel = getRiskLabel(value);
   const pct = Math.round(value * 100);
@@ -26,10 +30,15 @@ export default function RiskBar({ label, value, className = '' }: RiskBarProps) 
       <div className="flex items-center justify-between mb-1.5">
         <span className="text-[#8B949E] text-xs">{label}</span>
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded" style={{ color, backgroundColor: `${color}18` }}>
+          <span
+            className="text-[10px] font-medium px-1.5 py-0.5 rounded"
+            style={{ color, backgroundColor: `${color}18` }}
+          >
             {riskLabel}
           </span>
-          <span className="text-[#E6EDF3] text-xs font-mono font-semibold tabular-nums">{pct}</span>
+          <span className="text-[#E6EDF3] text-xs font-mono font-semibold tabular-nums">
+            {pct}
+          </span>
         </div>
       </div>
       <div className="w-full h-2 bg-[#21262D] rounded-full overflow-hidden">
@@ -53,7 +62,8 @@ interface RiskGaugeProps {
 
 export function RiskGauge({ score, size = 120 }: RiskGaugeProps) {
   const color = getRiskColor(score);
-  const label = score >= 0.68 ? 'HIGH RISK' : score >= 0.38 ? 'MEDIUM RISK' : 'LOW RISK';
+  const label =
+    score >= 0.68 ? "HIGH RISK" : score >= 0.38 ? "MEDIUM RISK" : "LOW RISK";
   const pct = Math.round(score * 100);
 
   const cx = size / 2;
@@ -91,24 +101,46 @@ export function RiskGauge({ score, size = 120 }: RiskGaugeProps) {
           strokeLinecap="round"
         />
         <path
-          d={describeArc(startAngle, startAngle + (endAngle - startAngle) * score)}
+          d={describeArc(
+            startAngle,
+            startAngle + (endAngle - startAngle) * score,
+          )}
           fill="none"
           stroke={color}
           strokeWidth={strokeWidth}
           strokeLinecap="round"
           style={{
             filter: `drop-shadow(0 0 6px ${color}80)`,
-            transition: 'stroke-dashoffset 1s ease-out',
+            transition: "stroke-dashoffset 1s ease-out",
           }}
         />
-        <text x={cx} y={cy - 4} textAnchor="middle" fill={color} fontSize={size * 0.22} fontWeight="bold" fontFamily="monospace">
+        <text
+          x={cx}
+          y={cy - 4}
+          textAnchor="middle"
+          fill={color}
+          fontSize={size * 0.22}
+          fontWeight="bold"
+          fontFamily="monospace"
+        >
           {pct}
         </text>
-        <text x={cx} y={cy + 14} textAnchor="middle" fill="#656D76" fontSize={size * 0.09}>
+        <text
+          x={cx}
+          y={cy + 14}
+          textAnchor="middle"
+          fill="#656D76"
+          fontSize={size * 0.09}
+        >
           /100
         </text>
       </svg>
-      <span className="text-xs font-bold tracking-widest mt-1" style={{ color }}>{label}</span>
+      <span
+        className="text-xs font-bold tracking-widest mt-1"
+        style={{ color }}
+      >
+        {label}
+      </span>
     </div>
   );
 }

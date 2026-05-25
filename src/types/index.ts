@@ -1,8 +1,13 @@
-export type TrustLevel = 'LOW' | 'MEDIUM' | 'HIGH';
-export type DecisionType = 'ALLOW' | 'BLOCK' | 'REVIEW';
-export type Criticality = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
-export type FeedbackEventType = 'INCIDENT' | 'ROLLBACK' | 'CLEAN_DEPLOY' | 'HOTFIX' | 'SECURITY_BREACH';
-export type AgentType = 'external' | 'internal' | 'mcp';
+export type TrustLevel = "LOW" | "MEDIUM" | "HIGH";
+export type DecisionType = "ALLOW" | "BLOCK" | "REVIEW";
+export type Criticality = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+export type FeedbackEventType =
+  | "INCIDENT"
+  | "ROLLBACK"
+  | "CLEAN_DEPLOY"
+  | "HOTFIX"
+  | "SECURITY_BREACH";
+export type AgentType = "external" | "internal" | "mcp";
 
 export interface Agent {
   id: string;
@@ -20,7 +25,7 @@ export interface Agent {
   avatarColor: string;
   initials: string;
   tags: string[];
-  recentTrend: 'up' | 'down' | 'stable';
+  recentTrend: "up" | "down" | "stable";
 }
 
 export interface TrustHistoryEntry {
@@ -28,14 +33,14 @@ export interface TrustHistoryEntry {
   agentId: string;
   date: string;
   trustScore: number;
-  eventType: FeedbackEventType | 'REGISTRATION' | 'MANUAL_REVIEW';
+  eventType: FeedbackEventType | "REGISTRATION" | "MANUAL_REVIEW";
   reason: string;
   trustDelta: number;
 }
 
 export interface ToolSignals {
   snyk: {
-    status: 'CLEAN' | 'WARNING' | 'CRITICAL';
+    status: "CLEAN" | "WARNING" | "CRITICAL";
     highVulns: number;
     medVulns: number;
     lowVulns: number;
@@ -43,14 +48,14 @@ export interface ToolSignals {
     finding?: string;
   };
   sonar: {
-    status: 'CLEAN' | 'WARNING' | 'CRITICAL';
+    status: "CLEAN" | "WARNING" | "CRITICAL";
     bugs: number;
     codeSmells: number;
     riskScore: number;
     finding?: string;
   };
   raven: {
-    status: 'OK' | 'WARNING' | 'VIOLATION';
+    status: "OK" | "WARNING" | "VIOLATION";
     policies: string[];
     riskScore: number;
     finding?: string;
@@ -93,7 +98,7 @@ export interface ProductionFeedback {
   agentId: string;
   agentName: string;
   eventType: FeedbackEventType;
-  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  severity: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
   serviceName: string;
   description: string;
   trustDelta: number;
@@ -110,16 +115,19 @@ export interface DemoScenario {
   description: string;
   pr: PRData;
   toolSignals: ToolSignals;
-  riskLevel: 'HIGH' | 'MEDIUM' | 'LOW';
+  riskLevel: "HIGH" | "MEDIUM" | "LOW";
   expectedDecision: DecisionType;
   demoNarrative: string;
 }
 
 export type NavigationPage =
-  | 'dashboard'
-  | 'agents'
-  | 'decision-engine'
-  | 'decision-intelligence'
-  | 'production-feedback'
-  | 'architecture'
-  | 'integrations';
+  | "dashboard"
+  | "agents"
+  | "decision-engine"
+  | "decision-intelligence"
+  | "production-feedback"
+  | "architecture"
+  | "integrations"
+  | "executive-finops"
+  | "finops"
+  | "cost-intelligence";

@@ -1,33 +1,36 @@
-import { useState } from 'react';
-import Sidebar from './components/layout/Sidebar';
-import TopBar from './components/layout/TopBar';
-import Dashboard from './pages/Dashboard';
-import AgentRegistry from './pages/AgentRegistry';
-import DecisionEngine from './pages/DecisionEngine';
-import DecisionIntelligence from './pages/DecisionIntelligence';
-import ProductionFeedback from './pages/ProductionFeedback';
-import Architecture from './pages/Architecture';
-import Integrations from './pages/Integrations';
-import type { NavigationPage } from './types';
+import { useState } from "react";
+import Sidebar from "./components/layout/Sidebar";
+import TopBar from "./components/layout/TopBar";
+import Dashboard from "./pages/Dashboard";
+import AgentRegistry from "./pages/AgentRegistry";
+import DecisionEngine from "./pages/DecisionEngine";
+import DecisionIntelligence from "./pages/DecisionIntelligence";
+import ProductionFeedback from "./pages/ProductionFeedback";
+import Architecture from "./pages/Architecture";
+import Integrations from "./pages/Integrations";
+import ExecutiveFinOps from "./pages/ExecutiveFinOps";
+import type { NavigationPage } from "./types";
 
 export default function App() {
-  const [activePage, setActivePage] = useState<NavigationPage>('dashboard');
+  const [activePage, setActivePage] = useState<NavigationPage>("dashboard");
 
   const renderPage = () => {
     switch (activePage) {
-      case 'dashboard':
+      case "dashboard":
         return <Dashboard />;
-      case 'agents':
+      case "agents":
         return <AgentRegistry />;
-      case 'decision-engine':
+      case "decision-engine":
         return <DecisionEngine />;
-      case 'decision-intelligence':
+      case "decision-intelligence":
         return <DecisionIntelligence />;
-      case 'production-feedback':
+      case "production-feedback":
         return <ProductionFeedback />;
-      case 'architecture':
+      case "executive-finops":
+        return <ExecutiveFinOps />;
+      case "architecture":
         return <Architecture />;
-      case 'integrations':
+      case "integrations":
         return <Integrations />;
       default:
         return <Dashboard />;
@@ -39,9 +42,7 @@ export default function App() {
       <Sidebar activePage={activePage} onNavigate={setActivePage} />
       <TopBar activePage={activePage} />
       <main className="ml-60 pt-[60px]">
-        <div className="p-6 max-w-7xl mx-auto">
-          {renderPage()}
-        </div>
+        <div className="p-6 max-w-7xl mx-auto">{renderPage()}</div>
       </main>
     </div>
   );

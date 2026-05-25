@@ -8,9 +8,11 @@
   }
 
   body {
-    background-color: #0D1117;
-    color: #E6EDF3;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', system-ui, sans-serif;
+    background-color: #0d1117;
+    color: #e6edf3;
+    font-family:
+      -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", system-ui,
+      sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -21,16 +23,16 @@
   }
 
   ::-webkit-scrollbar-track {
-    background: #0D1117;
+    background: #0d1117;
   }
 
   ::-webkit-scrollbar-thumb {
-    background: #21262D;
+    background: #21262d;
     border-radius: 3px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: #30363D;
+    background: #30363d;
   }
 }
 

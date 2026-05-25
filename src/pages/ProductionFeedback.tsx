@@ -1,16 +1,28 @@
-import { useState, useEffect } from 'react';
-import { AlertTriangle, CheckCircle, RotateCcw, Zap, TrendingDown, TrendingUp, Play } from 'lucide-react';
-import { SeverityBadge } from '../components/ui/Badge';
-import { MiniTrustBar } from '../components/ui/TrustRing';
-import { fetchProductionFeedback, fetchAgents } from '../lib/database';
-import type { ProductionFeedback, Agent } from '../types';
+import { useState, useEffect } from "react";
+import {
+  AlertTriangle,
+  CheckCircle,
+  RotateCcw,
+  Zap,
+  TrendingDown,
+  TrendingUp,
+  Play,
+} from "lucide-react";
+import { SeverityBadge } from "../components/ui/Badge";
+import { MiniTrustBar } from "../components/ui/TrustRing";
+import { fetchProductionFeedback, fetchAgents } from "../lib/database";
+import type { ProductionFeedback, Agent } from "../types";
 
 const EVENT_CONFIG = {
-  INCIDENT: { icon: AlertTriangle, color: '#E3B341', label: 'Incident' },
-  ROLLBACK: { icon: RotateCcw, color: '#F85149', label: 'Rollback' },
-  CLEAN_DEPLOY: { icon: CheckCircle, color: '#3FB950', label: 'Clean Deploy' },
-  HOTFIX: { icon: Zap, color: '#E3B341', label: 'Hotfix' },
-  SECURITY_BREACH: { icon: AlertTriangle, color: '#F85149', label: 'Security Breach' },
+  INCIDENT: { icon: AlertTriangle, color: "#E3B341", label: "Incident" },
+  ROLLBACK: { icon: RotateCcw, color: "#F85149", label: "Rollback" },
+  CLEAN_DEPLOY: { icon: CheckCircle, color: "#3FB950", label: "Clean Deploy" },
+  HOTFIX: { icon: Zap, color: "#E3B341", label: "Hotfix" },
+  SECURITY_BREACH: {
+    icon: AlertTriangle,
+    color: "#F85149",
+    label: "Security Breach",
+  },
 };
 
 function FeedbackCard({ feedback }: { feedback: ProductionFeedback }) {
@@ -30,34 +42,58 @@ function FeedbackCard({ feedback }: { feedback: ProductionFeedback }) {
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2 mb-1">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded" style={{ color: config.color, backgroundColor: `${config.color}15` }}>
+              <span
+                className="text-[10px] font-medium px-1.5 py-0.5 rounded"
+                style={{
+                  color: config.color,
+                  backgroundColor: `${config.color}15`,
+                }}
+              >
                 {config.label}
               </span>
               <SeverityBadge severity={feedback.severity} />
             </div>
-            <div className={`flex items-center gap-1 text-xs font-bold flex-shrink-0 ${isPositive ? 'text-[#3FB950]' : 'text-[#F85149]'}`}>
-              {isPositive ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-              {isPositive ? '+' : ''}{(feedback.trustDelta * 100).toFixed(0)}%
+            <div
+              className={`flex items-center gap-1 text-xs font-bold flex-shrink-0 ${isPositive ? "text-[#3FB950]" : "text-[#F85149]"}`}
+            >
+              {isPositive ? (
+                <TrendingUp size={12} />
+              ) : (
+                <TrendingDown size={12} />
+              )}
+              {isPositive ? "+" : ""}
+              {(feedback.trustDelta * 100).toFixed(0)}%
             </div>
           </div>
-          <p className="text-[#E6EDF3] text-xs font-medium mb-1">{feedback.agentName}</p>
-          <p className="text-[#8B949E] text-xs leading-relaxed mb-2">{feedback.description}</p>
+          <p className="text-[#E6EDF3] text-xs font-medium mb-1">
+            {feedback.agentName}
+          </p>
+          <p className="text-[#8B949E] text-xs leading-relaxed mb-2">
+            {feedback.description}
+          </p>
           <div className="flex items-center justify-between gap-3">
             <div className="text-[10px] text-[#8B949E]">
               {feedback.serviceName}
               {feedback.linkedPR && (
-                <span className="text-[#58A6FF] ml-2">#{feedback.linkedPR}</span>
+                <span className="text-[#58A6FF] ml-2">
+                  #{feedback.linkedPR}
+                </span>
               )}
             </div>
             <div className="flex items-center gap-2 text-[10px] text-[#656D76]">
-              <span className="text-[#8B949E]">{(feedback.previousTrust * 100).toFixed(0)}%</span>
+              <span className="text-[#8B949E]">
+                {(feedback.previousTrust * 100).toFixed(0)}%
+              </span>
               <span>→</span>
-              <span style={{ color: isPositive ? '#3FB950' : '#F85149' }}>{(feedback.newTrust * 100).toFixed(0)}%</span>
+              <span style={{ color: isPositive ? "#3FB950" : "#F85149" }}>
+                {(feedback.newTrust * 100).toFixed(0)}%
+              </span>
             </div>
           </div>
           <p className="text-[#656D76] text-[10px] mt-1">
             {new Date(feedback.occurredAt).toLocaleString()}
-            {feedback.resolvedAt && ` · Resolved ${new Date(feedback.resolvedAt).toLocaleString()}`}
+            {feedback.resolvedAt &&
+              ` · Resolved ${new Date(feedback.resolvedAt).toLocaleString()}`}
           </p>
         </div>
       </div>
@@ -65,18 +101,36 @@ function FeedbackCard({ feedback }: { feedback: ProductionFeedback }) {
   );
 }
 
-function AgentTrustImpactRow({ agentId, agents, feedbacks: allFeedbacks }: { agentId: string; agents: Agent[]; feedbacks: ProductionFeedback[] }) {
-  const agent = agents.find(a => a.id === agentId);
+function AgentTrustImpactRow({
+  agentId,
+  agents,
+  feedbacks: allFeedbacks,
+}: {
+  agentId: string;
+  agents: Agent[];
+  feedbacks: ProductionFeedback[];
+}) {
+  const agent = agents.find((a) => a.id === agentId);
   if (!agent) return null;
 
-  const feedbacks = allFeedbacks.filter(f => f.agentId === agentId);
-  const totalIncidents = feedbacks.filter(f => f.eventType === 'INCIDENT' || f.eventType === 'ROLLBACK' || f.eventType === 'SECURITY_BREACH').length;
-  const totalClean = feedbacks.filter(f => f.eventType === 'CLEAN_DEPLOY').length;
+  const feedbacks = allFeedbacks.filter((f) => f.agentId === agentId);
+  const totalIncidents = feedbacks.filter(
+    (f) =>
+      f.eventType === "INCIDENT" ||
+      f.eventType === "ROLLBACK" ||
+      f.eventType === "SECURITY_BREACH",
+  ).length;
+  const totalClean = feedbacks.filter(
+    (f) => f.eventType === "CLEAN_DEPLOY",
+  ).length;
   const totalDelta = feedbacks.reduce((s, f) => s + f.trustDelta, 0);
 
   return (
     <div className="flex items-center gap-4 py-3 border-b border-[#21262D] last:border-0">
-      <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0" style={{ backgroundColor: agent.avatarColor }}>
+      <div
+        className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+        style={{ backgroundColor: agent.avatarColor }}
+      >
         {agent.initials}
       </div>
       <div className="flex-1 min-w-0">
@@ -84,10 +138,15 @@ function AgentTrustImpactRow({ agentId, agents, feedbacks: allFeedbacks }: { age
         <MiniTrustBar score={agent.trustScore} />
       </div>
       <div className="text-right flex-shrink-0">
-        <p className={`text-xs font-bold tabular-nums ${totalDelta >= 0 ? 'text-[#3FB950]' : 'text-[#F85149]'}`}>
-          {totalDelta >= 0 ? '+' : ''}{(totalDelta * 100).toFixed(0)}%
+        <p
+          className={`text-xs font-bold tabular-nums ${totalDelta >= 0 ? "text-[#3FB950]" : "text-[#F85149]"}`}
+        >
+          {totalDelta >= 0 ? "+" : ""}
+          {(totalDelta * 100).toFixed(0)}%
         </p>
-        <p className="text-[#656D76] text-[10px]">{totalIncidents} incidents · {totalClean} clean</p>
+        <p className="text-[#656D76] text-[10px]">
+          {totalIncidents} incidents · {totalClean} clean
+        </p>
       </div>
     </div>
   );
@@ -102,7 +161,9 @@ function SimulatePanel() {
     setSimResult(null);
     setTimeout(() => {
       setSimulating(false);
-      setSimResult('Incident recorded for Internal MCP Agent v1. Trust score updated: 0.34 → 0.28. Agent is now at CRITICAL LOW trust threshold. Auto-restriction applied: agent blocked from HIGH and CRITICAL services until manual review.');
+      setSimResult(
+        "Incident recorded for Internal MCP Agent v1. Trust score updated: 0.34 → 0.28. Agent is now at CRITICAL LOW trust threshold. Auto-restriction applied: agent blocked from HIGH and CRITICAL services until manual review.",
+      );
     }, 2000);
   };
 
@@ -110,10 +171,14 @@ function SimulatePanel() {
     <div className="bg-[#161B22] border border-[#21262D] rounded-xl p-5">
       <div className="flex items-center gap-2 mb-4">
         <Play size={14} className="text-[#E3B341]" />
-        <h3 className="text-[#E6EDF3] font-semibold text-sm">Simulate Production Feedback</h3>
+        <h3 className="text-[#E6EDF3] font-semibold text-sm">
+          Simulate Production Feedback
+        </h3>
       </div>
       <p className="text-[#8B949E] text-xs leading-relaxed mb-4">
-        Simulate a production incident being fed back into ARIA's trust engine. Watch how it impacts the agent's trust score and triggers automatic restrictions.
+        Simulate a production incident being fed back into ARIA's trust engine.
+        Watch how it impacts the agent's trust score and triggers automatic
+        restrictions.
       </p>
 
       <div className="bg-[#0D1117] border border-[#21262D] rounded-lg p-3 mb-4 space-y-2 text-xs">
@@ -171,9 +236,13 @@ export default function ProductionFeedback() {
     fetchAgents().then(setAgents);
   }, []);
 
-  const uniqueAgentIds = [...new Set(feedbackList.map(f => f.agentId))];
-  const incidentCount = feedbackList.filter(f => ['INCIDENT', 'ROLLBACK', 'SECURITY_BREACH'].includes(f.eventType)).length;
-  const cleanCount = feedbackList.filter(f => f.eventType === 'CLEAN_DEPLOY').length;
+  const uniqueAgentIds = [...new Set(feedbackList.map((f) => f.agentId))];
+  const incidentCount = feedbackList.filter((f) =>
+    ["INCIDENT", "ROLLBACK", "SECURITY_BREACH"].includes(f.eventType),
+  ).length;
+  const cleanCount = feedbackList.filter(
+    (f) => f.eventType === "CLEAN_DEPLOY",
+  ).length;
 
   return (
     <div className="space-y-5">
@@ -183,9 +252,14 @@ export default function ProductionFeedback() {
             <TrendingDown size={18} className="text-[#F85149]" />
           </div>
           <div>
-            <h2 className="text-[#E6EDF3] font-semibold text-base mb-1">Production Feedback Loop</h2>
+            <h2 className="text-[#E6EDF3] font-semibold text-base mb-1">
+              Production Feedback Loop
+            </h2>
             <p className="text-[#8B949E] text-sm leading-relaxed">
-              ARIA continuously ingests production outcomes — incidents, rollbacks, clean deploys — and feeds them back into each agent's trust profile. This creates a self-improving risk model that adapts to real-world behavior.
+              ARIA continuously ingests production outcomes — incidents,
+              rollbacks, clean deploys — and feeds them back into each agent's
+              trust profile. This creates a self-improving risk model that
+              adapts to real-world behavior.
             </p>
           </div>
         </div>
@@ -193,12 +267,28 @@ export default function ProductionFeedback() {
 
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: 'Production Events', value: feedbackList.length, color: '#58A6FF' },
-          { label: 'Incidents & Rollbacks', value: incidentCount, color: '#F85149' },
-          { label: 'Clean Deploys', value: cleanCount, color: '#3FB950' },
-        ].map(s => (
-          <div key={s.label} className="bg-[#161B22] border border-[#21262D] rounded-xl p-4 text-center">
-            <p className="text-2xl font-bold tabular-nums" style={{ color: s.color }}>{s.value}</p>
+          {
+            label: "Production Events",
+            value: feedbackList.length,
+            color: "#58A6FF",
+          },
+          {
+            label: "Incidents & Rollbacks",
+            value: incidentCount,
+            color: "#F85149",
+          },
+          { label: "Clean Deploys", value: cleanCount, color: "#3FB950" },
+        ].map((s) => (
+          <div
+            key={s.label}
+            className="bg-[#161B22] border border-[#21262D] rounded-xl p-4 text-center"
+          >
+            <p
+              className="text-2xl font-bold tabular-nums"
+              style={{ color: s.color }}
+            >
+              {s.value}
+            </p>
             <p className="text-[#8B949E] text-xs mt-0.5">{s.label}</p>
           </div>
         ))}
@@ -206,20 +296,33 @@ export default function ProductionFeedback() {
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <div className="xl:col-span-2 space-y-3">
-          <h3 className="text-[#E6EDF3] font-semibold text-sm">Event Timeline</h3>
-          {[...feedbackList].sort((a, b) =>
-            new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime()
-          ).map(fb => (
-            <FeedbackCard key={fb.id} feedback={fb} />
-          ))}
+          <h3 className="text-[#E6EDF3] font-semibold text-sm">
+            Event Timeline
+          </h3>
+          {[...feedbackList]
+            .sort(
+              (a, b) =>
+                new Date(b.occurredAt).getTime() -
+                new Date(a.occurredAt).getTime(),
+            )
+            .map((fb) => (
+              <FeedbackCard key={fb.id} feedback={fb} />
+            ))}
         </div>
 
         <div className="space-y-5">
           <div className="bg-[#161B22] border border-[#21262D] rounded-xl p-5">
-            <h3 className="text-[#E6EDF3] font-semibold text-sm mb-4">Trust Impact by Agent</h3>
+            <h3 className="text-[#E6EDF3] font-semibold text-sm mb-4">
+              Trust Impact by Agent
+            </h3>
             <div>
-              {uniqueAgentIds.map(id => (
-                <AgentTrustImpactRow key={id} agentId={id} agents={agents} feedbacks={feedbackList} />
+              {uniqueAgentIds.map((id) => (
+                <AgentTrustImpactRow
+                  key={id}
+                  agentId={id}
+                  agents={agents}
+                  feedbacks={feedbackList}
+                />
               ))}
             </div>
           </div>
@@ -227,18 +330,32 @@ export default function ProductionFeedback() {
           <SimulatePanel />
 
           <div className="bg-[#161B22] border border-[#21262D] rounded-xl p-5">
-            <h3 className="text-[#E6EDF3] font-semibold text-sm mb-3">Trust Score Weights</h3>
+            <h3 className="text-[#E6EDF3] font-semibold text-sm mb-3">
+              Trust Score Weights
+            </h3>
             <div className="space-y-3">
               {[
-                { event: 'Clean Deploy (batch)', delta: '+2–6%', color: '#3FB950' },
-                { event: 'Minor Incident', delta: '-2–3%', color: '#E3B341' },
-                { event: 'Major Incident', delta: '-5–6%', color: '#F85149' },
-                { event: 'Rollback', delta: '-5–7%', color: '#F85149' },
-                { event: 'Security Breach', delta: '-8–12%', color: '#FF7B72' },
-              ].map(item => (
-                <div key={item.event} className="flex justify-between items-center text-xs py-1.5 border-b border-[#21262D] last:border-0">
+                {
+                  event: "Clean Deploy (batch)",
+                  delta: "+2–6%",
+                  color: "#3FB950",
+                },
+                { event: "Minor Incident", delta: "-2–3%", color: "#E3B341" },
+                { event: "Major Incident", delta: "-5–6%", color: "#F85149" },
+                { event: "Rollback", delta: "-5–7%", color: "#F85149" },
+                { event: "Security Breach", delta: "-8–12%", color: "#FF7B72" },
+              ].map((item) => (
+                <div
+                  key={item.event}
+                  className="flex justify-between items-center text-xs py-1.5 border-b border-[#21262D] last:border-0"
+                >
                   <span className="text-[#8B949E]">{item.event}</span>
-                  <span className="font-mono font-semibold" style={{ color: item.color }}>{item.delta}</span>
+                  <span
+                    className="font-mono font-semibold"
+                    style={{ color: item.color }}
+                  >
+                    {item.delta}
+                  </span>
                 </div>
               ))}
             </div>

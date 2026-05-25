@@ -4,17 +4,18 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
+  "Access-Control-Allow-Headers":
+    "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
 const SEVERITY_TRUST_DELTA: Record<string, number> = {
   "1": -0.15,
-  "2": -0.10,
+  "2": -0.1,
   "3": -0.06,
   "4": -0.03,
   "5": -0.01,
   critical: -0.15,
-  high: -0.10,
+  high: -0.1,
   medium: -0.06,
   low: -0.03,
 };
@@ -27,7 +28,7 @@ Deno.serve(async (req: Request) => {
   try {
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
     const payload = await req.json();
@@ -38,21 +39,31 @@ Deno.serve(async (req: Request) => {
       payload: payload,
     });
 
-    const incidentState = (payload.state ?? payload.incident_state ?? "").toLowerCase();
+    const incidentState = (
+      payload.state ??
+      payload.incident_state ??
+      ""
+    ).toLowerCase();
     const isNewOrActive = ["new", "active", "1", "2"].includes(incidentState);
 
     if (!isNewOrActive) {
-      return new Response(JSON.stringify({ ok: true, message: "Incident state not actionable" }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({ ok: true, message: "Incident state not actionable" }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
     }
 
-    const severity = (payload.severity ?? payload.impact ?? "3").toString().toLowerCase();
+    const severity = (payload.severity ?? payload.impact ?? "3")
+      .toString()
+      .toLowerCase();
     const trustDelta = SEVERITY_TRUST_DELTA[severity] ?? -0.05;
 
     const agentId = payload.ariaAgentId ?? null;
-    const githubUsername = payload.assignedTo ?? payload.github_username ?? null;
+    const githubUsername =
+      payload.assignedTo ?? payload.github_username ?? null;
 
     let agentQuery = supabase.from("agents").select("id, name, trust_score");
 
@@ -61,25 +72,33 @@ Deno.serve(async (req: Request) => {
     } else if (githubUsername) {
       agentQuery = agentQuery.eq("github_username", githubUsername);
     } else {
-      return new Response(JSON.stringify({ ok: true, message: "No agent identifier in payload" }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({ ok: true, message: "No agent identifier in payload" }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
     }
 
-    const { data: agent } = await agentQuery.eq("is_active", true).maybeSingle();
+    const { data: agent } = await agentQuery
+      .eq("is_active", true)
+      .maybeSingle();
 
     if (!agent) {
-      return new Response(JSON.stringify({ ok: true, message: "No matching ARIA agent found" }), {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(
+        JSON.stringify({ ok: true, message: "No matching ARIA agent found" }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
     }
 
     const newScore = Math.max(0, Math.min(1, agent.trust_score + trustDelta));
     let newLevel = "HIGH";
     if (newScore < 0.45) newLevel = "LOW";
-    else if (newScore < 0.70) newLevel = "MEDIUM";
+    else if (newScore < 0.7) newLevel = "MEDIUM";
 
     await supabase
       .from("agents")
@@ -99,7 +118,8 @@ Deno.serve(async (req: Request) => {
       agent_id: agent.id,
       event_type: "INCIDENT",
       service_name: payload.cmdb_ci ?? payload.service ?? "Unknown Service",
-      description: payload.short_description ?? "Incident reported via ServiceNow",
+      description:
+        payload.short_description ?? "Incident reported via ServiceNow",
       trust_impact: trustDelta,
       source: "servicenow",
       severity: severity,
@@ -107,14 +127,26 @@ Deno.serve(async (req: Request) => {
     });
 
     return new Response(
-      JSON.stringify({ ok: true, agentId: agent.id, agentName: agent.name, trustDelta, newScore: Math.round(newScore * 100) }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({
+        ok: true,
+        agentId: agent.id,
+        agentName: agent.name,
+        trustDelta,
+        newScore: Math.round(newScore * 100),
+      }),
+      {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
     );
   } catch (err) {
     console.error("servicenow-webhook error:", err);
-    return new Response(JSON.stringify({ error: "Internal server error", details: String(err) }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({ error: "Internal server error", details: String(err) }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
+    );
   }
 });

@@ -1,17 +1,24 @@
-import { useState, useEffect } from 'react';
-import { Bot, Shield, AlertTriangle, CheckCircle, TrendingDown, Clock } from 'lucide-react';
-import MetricCard from '../components/ui/MetricCard';
-import { DecisionBadge } from '../components/ui/Badge';
-import { MiniTrustBar } from '../components/ui/TrustRing';
-import { fetchAgents, fetchDecisions } from '../lib/database';
-import { AGENTS } from '../data/agentData';
-import { HISTORICAL_DECISIONS } from '../data/decisionData';
-import type { Agent, EvaluationResult } from '../types';
+import { useState, useEffect } from "react";
+import {
+  Bot,
+  Shield,
+  AlertTriangle,
+  CheckCircle,
+  TrendingDown,
+  Clock,
+} from "lucide-react";
+import MetricCard from "../components/ui/MetricCard";
+import { DecisionBadge } from "../components/ui/Badge";
+import { MiniTrustBar } from "../components/ui/TrustRing";
+import { fetchAgents, fetchDecisions } from "../lib/database";
+import { AGENTS } from "../data/agentData";
+import { HISTORICAL_DECISIONS } from "../data/decisionData";
+import type { Agent, EvaluationResult } from "../types";
 
 function TrustDistributionChart({ agents }: { agents: Agent[] }) {
-  const high = agents.filter(a => a.trustLevel === 'HIGH').length;
-  const med = agents.filter(a => a.trustLevel === 'MEDIUM').length;
-  const low = agents.filter(a => a.trustLevel === 'LOW').length;
+  const high = agents.filter((a) => a.trustLevel === "HIGH").length;
+  const med = agents.filter((a) => a.trustLevel === "MEDIUM").length;
+  const low = agents.filter((a) => a.trustLevel === "LOW").length;
   const total = agents.length || 1;
 
   const highPct = (high / total) * 100;
@@ -20,22 +27,47 @@ function TrustDistributionChart({ agents }: { agents: Agent[] }) {
 
   return (
     <div className="bg-[#161B22] border border-[#21262D] rounded-xl p-5">
-      <h3 className="text-[#E6EDF3] font-semibold text-sm mb-4">Agent Trust Distribution</h3>
+      <h3 className="text-[#E6EDF3] font-semibold text-sm mb-4">
+        Agent Trust Distribution
+      </h3>
       <div className="flex items-center gap-3 mb-5">
         <div className="flex-1 h-3 rounded-full overflow-hidden flex">
-          <div className="h-full bg-[#3FB950] transition-all duration-700" style={{ width: `${highPct}%` }} />
-          <div className="h-full bg-[#E3B341]" style={{ width: `${medPct}%` }} />
-          <div className="h-full bg-[#F85149]" style={{ width: `${lowPct}%` }} />
+          <div
+            className="h-full bg-[#3FB950] transition-all duration-700"
+            style={{ width: `${highPct}%` }}
+          />
+          <div
+            className="h-full bg-[#E3B341]"
+            style={{ width: `${medPct}%` }}
+          />
+          <div
+            className="h-full bg-[#F85149]"
+            style={{ width: `${lowPct}%` }}
+          />
         </div>
       </div>
       <div className="grid grid-cols-3 gap-3">
         {[
-          { label: 'High Trust', count: high, color: '#3FB950', bg: '#2EA043' },
-          { label: 'Medium Trust', count: med, color: '#E3B341', bg: '#D29922' },
-          { label: 'Low Trust', count: low, color: '#F85149', bg: '#DA3633' },
-        ].map(item => (
-          <div key={item.label} className="text-center p-3 rounded-lg" style={{ backgroundColor: `${item.bg}12` }}>
-            <p className="text-2xl font-bold tabular-nums" style={{ color: item.color }}>{item.count}</p>
+          { label: "High Trust", count: high, color: "#3FB950", bg: "#2EA043" },
+          {
+            label: "Medium Trust",
+            count: med,
+            color: "#E3B341",
+            bg: "#D29922",
+          },
+          { label: "Low Trust", count: low, color: "#F85149", bg: "#DA3633" },
+        ].map((item) => (
+          <div
+            key={item.label}
+            className="text-center p-3 rounded-lg"
+            style={{ backgroundColor: `${item.bg}12` }}
+          >
+            <p
+              className="text-2xl font-bold tabular-nums"
+              style={{ color: item.color }}
+            >
+              {item.count}
+            </p>
             <p className="text-[10px] text-[#8B949E] mt-0.5">{item.label}</p>
           </div>
         ))}
@@ -44,7 +76,11 @@ function TrustDistributionChart({ agents }: { agents: Agent[] }) {
   );
 }
 
-function RecentDecisionRow({ result }: { result: typeof HISTORICAL_DECISIONS[0] }) {
+function RecentDecisionRow({
+  result,
+}: {
+  result: (typeof HISTORICAL_DECISIONS)[0];
+}) {
   return (
     <div className="flex items-center justify-between py-3 border-b border-[#21262D] last:border-0 group hover:bg-[#161B22]/40 px-2 -mx-2 rounded-lg transition-colors">
       <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -55,7 +91,9 @@ function RecentDecisionRow({ result }: { result: typeof HISTORICAL_DECISIONS[0] 
           {result.agent.initials}
         </div>
         <div className="min-w-0">
-          <p className="text-[#E6EDF3] text-xs font-medium truncate">{result.pr.title}</p>
+          <p className="text-[#E6EDF3] text-xs font-medium truncate">
+            {result.pr.title}
+          </p>
           <p className="text-[#656D76] text-[10px]">{result.pr.serviceName}</p>
         </div>
       </div>
@@ -69,10 +107,18 @@ function RecentDecisionRow({ result }: { result: typeof HISTORICAL_DECISIONS[0] 
   );
 }
 
-function AgentRankRow({ agent, rank }: { agent: typeof AGENTS[0]; rank: number }) {
+function AgentRankRow({
+  agent,
+  rank,
+}: {
+  agent: (typeof AGENTS)[0];
+  rank: number;
+}) {
   return (
     <div className="flex items-center gap-3 py-2.5">
-      <span className="text-[#656D76] text-xs w-4 text-center font-mono">{rank}</span>
+      <span className="text-[#656D76] text-xs w-4 text-center font-mono">
+        {rank}
+      </span>
       <div
         className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0"
         style={{ backgroundColor: agent.avatarColor }}
@@ -80,7 +126,9 @@ function AgentRankRow({ agent, rank }: { agent: typeof AGENTS[0]; rank: number }
         {agent.initials}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-[#E6EDF3] text-xs font-medium truncate">{agent.name}</p>
+        <p className="text-[#E6EDF3] text-xs font-medium truncate">
+          {agent.name}
+        </p>
         <MiniTrustBar score={agent.trustScore} />
       </div>
       <span className="text-xs font-mono tabular-nums text-[#8B949E] flex-shrink-0">
@@ -97,15 +145,24 @@ function SparkLine({ data, color }: { data: number[]; color: string }) {
   const min = Math.min(...data);
   const range = max - min || 1;
 
-  const points = data.map((v, i) => {
-    const x = (i / (data.length - 1)) * w;
-    const y = h - ((v - min) / range) * (h - 4) - 2;
-    return `${x},${y}`;
-  }).join(' ');
+  const points = data
+    .map((v, i) => {
+      const x = (i / (data.length - 1)) * w;
+      const y = h - ((v - min) / range) * (h - 4) - 2;
+      return `${x},${y}`;
+    })
+    .join(" ");
 
   return (
     <svg width={w} height={h}>
-      <polyline points={points} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <polyline
+        points={points}
+        fill="none"
+        stroke={color}
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
       <polyline
         points={`0,${h} ${points} ${w},${h}`}
         fill={`${color}18`}
@@ -117,7 +174,8 @@ function SparkLine({ data, color }: { data: number[]; color: string }) {
 
 export default function Dashboard() {
   const [agents, setAgents] = useState<Agent[]>(AGENTS);
-  const [decisions, setDecisions] = useState<EvaluationResult[]>(HISTORICAL_DECISIONS);
+  const [decisions, setDecisions] =
+    useState<EvaluationResult[]>(HISTORICAL_DECISIONS);
 
   useEffect(() => {
     fetchAgents().then(setAgents);
@@ -125,13 +183,16 @@ export default function Dashboard() {
   }, []);
 
   const totalAgents = agents.length;
-  const highRiskAgents = agents.filter(a => a.trustLevel === 'LOW').length;
+  const highRiskAgents = agents.filter((a) => a.trustLevel === "LOW").length;
   const totalDecisions = decisions.length || 1;
-  const avgTrust = agents.length > 0 ? agents.reduce((s, a) => s + a.trustScore, 0) / agents.length : 0;
+  const avgTrust =
+    agents.length > 0
+      ? agents.reduce((s, a) => s + a.trustScore, 0) / agents.length
+      : 0;
 
-  const blockedCount = decisions.filter(d => d.decision === 'BLOCK').length;
-  const reviewCount = decisions.filter(d => d.decision === 'REVIEW').length;
-  const allowCount = decisions.filter(d => d.decision === 'ALLOW').length;
+  const blockedCount = decisions.filter((d) => d.decision === "BLOCK").length;
+  const reviewCount = decisions.filter((d) => d.decision === "REVIEW").length;
+  const allowCount = decisions.filter((d) => d.decision === "ALLOW").length;
 
   const sortedAgents = [...agents].sort((a, b) => b.trustScore - a.trustScore);
 
@@ -176,36 +237,71 @@ export default function Dashboard() {
         <TrustDistributionChart agents={agents} />
 
         <div className="bg-[#161B22] border border-[#21262D] rounded-xl p-5">
-          <h3 className="text-[#E6EDF3] font-semibold text-sm mb-4">Decision Breakdown</h3>
+          <h3 className="text-[#E6EDF3] font-semibold text-sm mb-4">
+            Decision Breakdown
+          </h3>
           {[
-            { label: 'Approved', count: allowCount, color: '#3FB950', pct: (allowCount / totalDecisions) * 100 },
-            { label: 'Review Required', count: reviewCount, color: '#E3B341', pct: (reviewCount / totalDecisions) * 100 },
-            { label: 'Blocked', count: blockedCount, color: '#F85149', pct: (blockedCount / totalDecisions) * 100 },
-          ].map(item => (
+            {
+              label: "Approved",
+              count: allowCount,
+              color: "#3FB950",
+              pct: (allowCount / totalDecisions) * 100,
+            },
+            {
+              label: "Review Required",
+              count: reviewCount,
+              color: "#E3B341",
+              pct: (reviewCount / totalDecisions) * 100,
+            },
+            {
+              label: "Blocked",
+              count: blockedCount,
+              color: "#F85149",
+              pct: (blockedCount / totalDecisions) * 100,
+            },
+          ].map((item) => (
             <div key={item.label} className="mb-3 last:mb-0">
               <div className="flex justify-between items-center mb-1.5">
                 <span className="text-[#8B949E] text-xs">{item.label}</span>
-                <span className="text-[#E6EDF3] text-xs font-mono font-semibold">{item.count}</span>
+                <span className="text-[#E6EDF3] text-xs font-mono font-semibold">
+                  {item.count}
+                </span>
               </div>
               <div className="w-full h-2 bg-[#21262D] rounded-full overflow-hidden">
-                <div className="h-full rounded-full" style={{ width: `${item.pct}%`, backgroundColor: item.color }} />
+                <div
+                  className="h-full rounded-full"
+                  style={{ width: `${item.pct}%`, backgroundColor: item.color }}
+                />
               </div>
             </div>
           ))}
 
           <div className="mt-5 pt-4 border-t border-[#21262D]">
-            <p className="text-[#8B949E] text-[10px] font-medium uppercase tracking-wide mb-3">Trend (7 days)</p>
+            <p className="text-[#8B949E] text-[10px] font-medium uppercase tracking-wide mb-3">
+              Trend (7 days)
+            </p>
             <div className="flex items-center gap-2">
-              <SparkLine data={[2, 3, 1, 4, 2, 3, allowCount]} color="#3FB950" />
-              <SparkLine data={[1, 2, 2, 1, 2, 2, reviewCount]} color="#E3B341" />
-              <SparkLine data={[0, 1, 1, 0, 1, 0, blockedCount]} color="#F85149" />
+              <SparkLine
+                data={[2, 3, 1, 4, 2, 3, allowCount]}
+                color="#3FB950"
+              />
+              <SparkLine
+                data={[1, 2, 2, 1, 2, 2, reviewCount]}
+                color="#E3B341"
+              />
+              <SparkLine
+                data={[0, 1, 1, 0, 1, 0, blockedCount]}
+                color="#F85149"
+              />
             </div>
           </div>
         </div>
 
         <div className="bg-[#161B22] border border-[#21262D] rounded-xl p-5">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-[#E6EDF3] font-semibold text-sm">Agent Leaderboard</h3>
+            <h3 className="text-[#E6EDF3] font-semibold text-sm">
+              Agent Leaderboard
+            </h3>
             <span className="text-[#656D76] text-[10px]">By Trust Score</span>
           </div>
           <div className="divide-y divide-[#21262D]">
@@ -218,14 +314,16 @@ export default function Dashboard() {
 
       <div className="bg-[#161B22] border border-[#21262D] rounded-xl p-5">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-[#E6EDF3] font-semibold text-sm">Recent Evaluations</h3>
+          <h3 className="text-[#E6EDF3] font-semibold text-sm">
+            Recent Evaluations
+          </h3>
           <div className="flex items-center gap-1.5 text-[#656D76] text-xs">
             <Clock size={12} />
             <span>Last 48 hours</span>
           </div>
         </div>
         <div>
-          {decisions.map(decision => (
+          {decisions.map((decision) => (
             <RecentDecisionRow key={decision.id} result={decision} />
           ))}
         </div>
@@ -233,16 +331,45 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: 'Production Incidents Linked', value: '6', color: '#F85149', icon: <TrendingDown size={14} />, sub: 'Last 90 days' },
-          { label: 'Avg Trust Score Growth', value: '+12%', color: '#3FB950', icon: <CheckCircle size={14} />, sub: 'vs last quarter' },
-          { label: 'Override Rate', value: '2.1%', color: '#E3B341', icon: <AlertTriangle size={14} />, sub: 'Human overrides on ARIA decisions' },
-        ].map(stat => (
-          <div key={stat.label} className="bg-[#161B22] border border-[#21262D] rounded-xl p-4 flex items-center gap-4">
-            <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${stat.color}18` }}>
+          {
+            label: "Production Incidents Linked",
+            value: "6",
+            color: "#F85149",
+            icon: <TrendingDown size={14} />,
+            sub: "Last 90 days",
+          },
+          {
+            label: "Avg Trust Score Growth",
+            value: "+12%",
+            color: "#3FB950",
+            icon: <CheckCircle size={14} />,
+            sub: "vs last quarter",
+          },
+          {
+            label: "Override Rate",
+            value: "2.1%",
+            color: "#E3B341",
+            icon: <AlertTriangle size={14} />,
+            sub: "Human overrides on ARIA decisions",
+          },
+        ].map((stat) => (
+          <div
+            key={stat.label}
+            className="bg-[#161B22] border border-[#21262D] rounded-xl p-4 flex items-center gap-4"
+          >
+            <div
+              className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
+              style={{ backgroundColor: `${stat.color}18` }}
+            >
               <span style={{ color: stat.color }}>{stat.icon}</span>
             </div>
             <div>
-              <p className="text-2xl font-bold tabular-nums" style={{ color: stat.color }}>{stat.value}</p>
+              <p
+                className="text-2xl font-bold tabular-nums"
+                style={{ color: stat.color }}
+              >
+                {stat.value}
+              </p>
               <p className="text-[#8B949E] text-xs">{stat.label}</p>
               <p className="text-[#656D76] text-[10px]">{stat.sub}</p>
             </div>

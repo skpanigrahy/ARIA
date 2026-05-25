@@ -1,15 +1,37 @@
-import { Bell, User, ChevronDown } from 'lucide-react';
-import type { NavigationPage } from '../../types';
+import { Bell, User, ChevronDown } from "lucide-react";
+import type { NavigationPage } from "../../types";
 
-const PAGE_TITLES: Record<NavigationPage, { title: string; subtitle: string }> = {
-  dashboard: { title: 'Dashboard', subtitle: 'Real-time trust intelligence overview' },
-  agents: { title: 'Agent Registry', subtitle: 'AI agent profiles and trust history' },
-  'decision-engine': { title: 'Decision Engine', subtitle: 'Live ARIA evaluation & risk analysis' },
-  'decision-intelligence': { title: 'Decision Intelligence', subtitle: 'Full decision history and reasoning trails' },
-  'production-feedback': { title: 'Production Feedback', subtitle: 'Outcomes feeding back into trust scores' },
-  architecture: { title: 'Architecture', subtitle: 'Platform design and component overview' },
-  integrations: { title: 'Integrations', subtitle: 'Webhook endpoints and connected systems' },
-};
+const PAGE_TITLES: Record<NavigationPage, { title: string; subtitle: string }> =
+  {
+    dashboard: {
+      title: "Dashboard",
+      subtitle: "Real-time trust intelligence overview",
+    },
+    agents: {
+      title: "Agent Registry",
+      subtitle: "AI agent profiles and trust history",
+    },
+    "decision-engine": {
+      title: "Decision Engine",
+      subtitle: "Live ARIA evaluation & risk analysis",
+    },
+    "decision-intelligence": {
+      title: "Decision Intelligence",
+      subtitle: "Full decision history and reasoning trails",
+    },
+    "production-feedback": {
+      title: "Production Feedback",
+      subtitle: "Outcomes feeding back into trust scores",
+    },
+    architecture: {
+      title: "Architecture",
+      subtitle: "Platform design and component overview",
+    },
+    integrations: {
+      title: "Integrations",
+      subtitle: "Webhook endpoints and connected systems",
+    },
+  };
 
 interface TopBarProps {
   activePage: NavigationPage;
@@ -21,7 +43,9 @@ export default function TopBar({ activePage }: TopBarProps) {
   return (
     <header className="fixed top-0 left-60 right-0 h-[60px] bg-[#0D1117]/95 backdrop-blur-sm border-b border-[#21262D] flex items-center justify-between px-6 z-10">
       <div>
-        <h1 className="text-[#E6EDF3] font-semibold text-base leading-tight">{title}</h1>
+        <h1 className="text-[#E6EDF3] font-semibold text-base leading-tight">
+          {title}
+        </h1>
         <p className="text-[#8B949E] text-xs">{subtitle}</p>
       </div>
 
@@ -32,7 +56,10 @@ export default function TopBar({ activePage }: TopBarProps) {
         </div>
 
         <button className="relative w-8 h-8 flex items-center justify-center rounded-lg hover:bg-[#161B22] transition-colors group">
-          <Bell size={16} className="text-[#8B949E] group-hover:text-[#E6EDF3]" />
+          <Bell
+            size={16}
+            className="text-[#8B949E] group-hover:text-[#E6EDF3]"
+          />
           <span className="absolute top-1 right-1 w-2 h-2 bg-[#DA3633] rounded-full border border-[#0D1117]" />
         </button>
 

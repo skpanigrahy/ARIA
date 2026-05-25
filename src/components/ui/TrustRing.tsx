@@ -6,18 +6,23 @@ interface TrustRingProps {
 }
 
 function getTrustColor(score: number): string {
-  if (score >= 0.70) return '#3FB950';
-  if (score >= 0.45) return '#E3B341';
-  return '#F85149';
+  if (score >= 0.7) return "#3FB950";
+  if (score >= 0.45) return "#E3B341";
+  return "#F85149";
 }
 
 function getTrustGradientId(score: number): string {
-  if (score >= 0.70) return 'trust-high';
-  if (score >= 0.45) return 'trust-med';
-  return 'trust-low';
+  if (score >= 0.7) return "trust-high";
+  if (score >= 0.45) return "trust-med";
+  return "trust-low";
 }
 
-export default function TrustRing({ score, size = 80, strokeWidth = 7, showLabel = true }: TrustRingProps) {
+export default function TrustRing({
+  score,
+  size = 80,
+  strokeWidth = 7,
+  showLabel = true,
+}: TrustRingProps) {
   const radius = (size - strokeWidth * 2) / 2;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference * (1 - score);
@@ -28,7 +33,7 @@ export default function TrustRing({ score, size = 80, strokeWidth = 7, showLabel
 
   return (
     <div className="relative inline-flex items-center justify-center">
-      <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+      <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
         <defs>
           <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
             <stop offset="0%" stopColor={color} stopOpacity="0.6" />
@@ -53,16 +58,22 @@ export default function TrustRing({ score, size = 80, strokeWidth = 7, showLabel
           strokeDasharray={circumference}
           strokeDashoffset={offset}
           strokeLinecap="round"
-          style={{ transition: 'stroke-dashoffset 0.8s ease-in-out' }}
+          style={{ transition: "stroke-dashoffset 0.8s ease-in-out" }}
         />
       </svg>
       {showLabel && (
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="font-bold leading-none" style={{ fontSize: size * 0.22, color }}>
+          <span
+            className="font-bold leading-none"
+            style={{ fontSize: size * 0.22, color }}
+          >
             {Math.round(score * 100)}
           </span>
           {size >= 70 && (
-            <span className="text-[#656D76] leading-none mt-0.5" style={{ fontSize: size * 0.12 }}>
+            <span
+              className="text-[#656D76] leading-none mt-0.5"
+              style={{ fontSize: size * 0.12 }}
+            >
               /100
             </span>
           )}

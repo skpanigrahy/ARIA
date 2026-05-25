@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -24,7 +24,7 @@ export interface AriaEvaluation {
 
 export async function saveEvaluation(evaluation: AriaEvaluation) {
   const { data, error } = await supabase
-    .from('aria_evaluations')
+    .from("aria_evaluations")
     .insert(evaluation)
     .select()
     .maybeSingle();
@@ -33,10 +33,10 @@ export async function saveEvaluation(evaluation: AriaEvaluation) {
 
 export async function fetchRecentEvaluations(limit = 20) {
   const { data, error } = await supabase
-    .from('aria_evaluations')
-    .select('*')
-    .eq('is_demo', true)
-    .order('created_at', { ascending: false })
+    .from("aria_evaluations")
+    .select("*")
+    .eq("is_demo", true)
+    .order("created_at", { ascending: false })
     .limit(limit);
   return { data, error };
 }
