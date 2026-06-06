@@ -1,0 +1,32 @@
+
+Here are all the files created or modified for the three phases:
+
+Phase 7 - Agent Trap Hardening
+
+src/pages/AgentTrapHardening.tsx — created (new page: adversarial detection event log, threat level filtering, payload detail panel, hardening rules)
+Phase 8 - Managed Agent Architecture
+
+src/pages/ManagedAgentArchitecture.tsx — created (new page: orchestration topology tree, agent pool table, routing rules panel)
+Phase 9 - Business Outcome FinOps
+
+src/pages/BusinessOutcomeFinOps.tsx — created (new page: ROI attribution, cost-per-outcome, 6-week trend chart, LOB breakdown)
+Wiring (touched to connect all three)
+
+src/types/index.ts — added 'agent-trap-hardening' | 'managed-agent-architecture' | 'business-outcome-finops' to the NavigationPage union type
+src/App.tsx — imported all three pages, added their case statements to the router
+src/components/layout/Sidebar.tsx — added 3 nav items (Trap Hardening + Agent Topology under new "Security" section, Outcome FinOps under "FinOps & Cost"); also refactored flat list into grouped sections
+src/components/layout/TopBar.tsx — added page titles/subtitles for all three new pages (required to avoid a runtime crash when navigating to them)
+
+ The three phase documents cover:
+
+Phase 7: Agent Trap Hardening (security hardening against adversarial inputs)
+Phase 8: Managed Agent Architecture (multi-agent orchestration)
+Phase 9: Business Outcome FinOps (ROI/business value tracking)
+Let me now do a thorough analysis and implement the highest-value features:
+
+Plan
+Create ManagedAgentArchitecture.tsx (Phase 8)
+Create BusinessOutcomeFinOps.tsx (Phase 9)
+Wire up routing in types, App.tsx, and Sidebar
+Run npm run build to verify
+Plan completed
