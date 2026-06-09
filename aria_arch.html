@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0A1628; font-family: 'Segoe UI', Arial, sans-serif; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<canvas id="c" width="2400" height="1600"></canvas>
+<script>
+const cv = document.getElementById('c');
+const ctx = cv.getContext('2d');
+
+// ── Palette ──────────────────────────────────────────────────────────────
+const P = {
+  navy:      '#0A1628',
+  navyMid:   '#112240',
+  navyCard:  '#162845',
+  teal:      '#00B4D8',
+  tealDark:  '#0077A8',
+  tealLight: '#90E0EF',
+  tealPale:  '#CAF0F8',
+  white:     '#FFFFFF',
+  offWhite:  '#E2E8F0',
+  slate:     '#94A3B8',
+  green:     '#38A169',
+  amber:     '#D97706',
+  purple:    '#7C3AED',
+  red:       '#E53E3E',
+};
+
+// ── Helpers ──────────────────────────────────────────────────────────────
+function roundRect(x, y, w, h, r, fill, stroke, sw=1) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+  if (fill)  { ctx.fillStyle = fill; ctx.fill(); }
+  if (stroke){ ctx.strokeStyle = stroke; ctx.lineWidth = sw; ctx.stroke(); }
+}
+
+function text(str, x, y, size, color, align='left', bold=false, italic=false) {
+  ctx.fillStyle = color;
+  ctx.font = `${italic?'italic ':''}${bold?'bold ':''}${size}px 'Segoe UI', Arial`;
+  ctx.textAlign = align;
+  ctx.fillText(str, x, y);
+}
+
+function arrow(x1, y1, x2, y2, color=P.teal, dashed=false) {
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  if (dashed) { ctx.setLineDash([8,5]); } else { ctx.setLineDash([]); }
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  // arrowhead
+  const angle = Math.atan2(y2 - y1, x2 - x1);
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(x2, y2);
+  ctx.lineTo(x2 - 12*Math.cos(angle-0.4), y2 - 12*Math.sin(angle-0.4));
+  ctx.lineTo(x2 - 12*Math.cos(angle+0.4), y2 - 12*Math.sin(angle+0.4));
+  ctx.closePath();
+  ctx.fill();
+}
+
+function biArrow(x1, y1, x2, y2, color=P.teal) {
+  arrow(x1, y1, x2, y2, color);
+  arrow(x2, y2, x1, y1, color);
+}
+
+function label(txt, x, y, bgColor, textColor=P.navy, size=18) {
+  ctx.font = `bold ${size}px 'Segoe UI', Arial`;
+  const w = ctx.measureText(txt).width + 20;
+  roundRect(x - w/2, y - 14, w, 26, 5, bgColor, null);
+  text(txt, x, y + 5, size, textColor, 'center', true);
+}
+
+function shadow(x, y, w, h) {
+  ctx.shadowColor = 'rgba(0,0,0,0.35)';
+  ctx.shadowBlur = 18;
+  ctx.shadowOffsetX = 4;
+  ctx.shadowOffsetY = 6;
+}
+function noShadow() {
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 0;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// BACKGROUND
+// ════════════════════════════════════════════════════════════════════════════
+ctx.fillStyle = P.navy;
+ctx.fillRect(0, 0, 2400, 1600);
+
+// Subtle grid
+ctx.strokeStyle = 'rgba(0,180,216,0.04)';
+ctx.lineWidth = 1;
+for (let x = 0; x < 2400; x += 60) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,1600); ctx.stroke(); }
+for (let y = 0; y < 1600; y += 60) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(2400,y); ctx.stroke(); }
+
+// Title
+text('ARIA — Complete Architecture', 1200, 70, 44, P.white, 'center', true);
+text('Adaptive Reasoning & Intelligence Assistant  ·  FinOps Cost Intelligence Platform', 1200, 108, 20, P.tealLight, 'center', false, true);
+
+// Horizontal separator
+ctx.strokeStyle = P.tealDark;
+ctx.lineWidth = 1.5;
+ctx.beginPath(); ctx.moveTo(80, 125); ctx.lineTo(2320, 125); ctx.stroke();
+
+// ════════════════════════════════════════════════════════════════════════════
+// LAYER 1 — BROWSER / REACT DASHBOARD  (top)
+// ════════════════════════════════════════════════════════════════════════════
+shadow();
+roundRect(80, 145, 2240, 130, 10, P.navyMid, P.teal, 2);
+noShadow();
+roundRect(80, 145, 2240, 34, 10, P.teal, null);
+text('LAYER 1 — BROWSER / REACT DASHBOARD', 100, 169, 15, P.navy, 'left', true);
+
+// 9 tab boxes
+const tabs = [
+  {n:'T1', label:'Overview',        sub:'MTD Spend\nBudget %',  c:P.teal},
+  {n:'T2', label:'Sessions',        sub:'Per-session\nCost',     c:P.teal},
+  {n:'T3', label:'Features',        sub:'Feature\nCost',         c:P.teal},
+  {n:'T4', label:'Trends',          sub:'Daily\nForecast',       c:P.teal},
+  {n:'T5', label:'Optimizer',       sub:'Rules\nActions',        c:P.tealDark},
+  {n:'T6', label:'Context\nWindow', sub:'5 Segment\nChart',      c:P.tealDark},
+  {n:'T7', label:'AI Advisor',      sub:'Claude\nAPI Direct',    c:P.tealDark},
+  {n:'T8', label:'Security',        sub:'Audit Log\nSession',    c:P.purple},
+  {n:'T9', label:'Business\nOutcomes', sub:'Cost/Outcome\nBenchmark', c:P.amber},
+];
+tabs.forEach((t, i) => {
+  const tx = 95 + i * 243;
+  const ty = 188;
+  roundRect(tx, ty, 230, 78, 6, P.navyCard, t.c, 1.5);
+  text(t.label, tx + 115, ty + 28, 15, P.white, 'center', true);
+  const lines = t.sub.split('\n');
+  lines.forEach((l, li) => text(l, tx+115, ty+48+li*18, 12, P.slate, 'center'));
+  // phase badge
+  roundRect(tx+170, ty+3, 50, 18, 4, t.c, null);
+  text(t.n, tx+195, ty+15, 11, P.navy, 'center', true);
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// ARROW: Dashboard ↔ REST APIs
+// ════════════════════════════════════════════════════════════════════════════
+arrow(1200, 275, 1200, 310, P.teal);
+text('REST APIs  ·  3s / 30s polling', 1215, 297, 13, P.tealLight, 'left');
+
+// ════════════════════════════════════════════════════════════════════════════
+// LAYER 2 — REST API SURFACE
+// ════════════════════════════════════════════════════════════════════════════
+shadow();
+roundRect(80, 315, 2240, 110, 10, P.navyMid, P.tealDark, 2);
+noShadow();
+roundRect(80, 315, 2240, 34, 10, P.tealDark, null);
+text('LAYER 2 — REST API SURFACE  (Spring Boot 3 Controllers)', 100, 339, 15, P.white, 'left', true);
+
+const apis = [
+  {p:'Ph 1', ep:'/api/aria/context/stats',       col: P.teal},
+  {p:'Ph 4', ep:'/api/aria/cost/**',              col: P.teal},
+  {p:'Ph 5', ep:'/api/aria/optimizer/**',         col: P.tealDark},
+  {p:'Ph 7', ep:'/api/aria/security/**',          col: P.purple},
+  {p:'Ph 8', ep:'/api/aria/session/{id}/events',  col: P.purple},
+  {p:'Ph 9', ep:'/api/aria/business/**',          col: P.amber},
+];
+apis.forEach((a, i) => {
+  const ax = 95 + i * 372;
+  roundRect(ax, 358, 355, 58, 6, P.navyCard, a.col, 1.5);
+  roundRect(ax, 358, 48, 20, 4, a.col, null);
+  text(a.p, ax+24, 372, 11, P.navy, 'center', true);
+  text(a.ep, ax+10, 396, 13, P.tealLight, 'left', true);
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// ARROW: APIs ↔ Agent Service
+// ════════════════════════════════════════════════════════════════════════════
+arrow(1200, 425, 1200, 460, P.teal);
+
+// ════════════════════════════════════════════════════════════════════════════
+// LAYER 3 — AGENT ORCHESTRATION (central, widest)
+// ════════════════════════════════════════════════════════════════════════════
+shadow();
+roundRect(80, 465, 2240, 200, 10, P.navyMid, P.teal, 2.5);
+noShadow();
+roundRect(80, 465, 2240, 34, 10, P.teal, null);
+text('LAYER 3 — AGENT ORCHESTRATION  (AriaAgentService.java  ·  Spring AI  ·  Java 21)', 100, 489, 15, P.navy, 'left', true);
+
+// Sub-boxes inside agent orchestration
+const agentBoxes = [
+  { label:'AriaSessionContext\n(ThreadLocal)',     sub:'sessionId · featureId\nuserId · departmentId', c:P.teal,    w:280 },
+  { label:'AriaContextToken\nService  (Ph 1)',     sub:'Pre-call 5-segment\ntoken estimation',          c:P.teal,    w:280 },
+  { label:'AriaOptimizerService\n(Ph 5)',          sub:'7 rules: route · cache\nthrottle · batch',      c:P.tealDark,w:280 },
+  { label:'AriaToolGateway\n(Ph 8)',               sub:'execute(name,input)→str\nLazy provisioning',    c:P.tealDark,w:280 },
+  { label:'AriaSessionEventLog\n(Ph 8)',           sub:'emitEvent() · getEvents()\nCrash recovery',     c:P.purple,  w:280 },
+  { label:'Spring AI\nChatClient',                sub:'Prompt assembly\nRAG · Memory · Tools',          c:P.teal,    w:270 },
+  { label:'AriaInputSanitiser\n(Ph 7)',            sub:'HTML strip · Injection\nkeyword detection',     c:P.amber,   w:270 },
+];
+let bx = 100;
+agentBoxes.forEach((b) => {
+  roundRect(bx, 510, b.w, 140, 8, P.navyCard, b.c, 1.5);
+  roundRect(bx, 510, b.w, 24, 4, b.c, null);
+  text(b.label.split('\n')[0], bx + b.w/2, 525, 13, P.navy, 'center', true);
+  if (b.label.includes('\n')) text(b.label.split('\n')[1], bx + b.w/2, 540, 12, P.navy, 'center', true);
+  const slines = b.sub.split('\n');
+  slines.forEach((sl, si) => text(sl, bx + b.w/2, 574+si*20, 12, P.slate, 'center'));
+  bx += b.w + 20;
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// ARROW: Agent → Proxy
+// ════════════════════════════════════════════════════════════════════════════
+arrow(1200, 665, 1200, 700, P.teal);
+text('HTTP outbound  ·  WebClient', 1215, 688, 13, P.tealLight, 'left');
+
+// ════════════════════════════════════════════════════════════════════════════
+// LAYER 4 — API PROXY INTERCEPTOR
+// ════════════════════════════════════════════════════════════════════════════
+shadow();
+roundRect(80, 705, 2240, 110, 10, P.navyMid, P.teal, 2);
+noShadow();
+roundRect(80, 705, 2240, 34, 10, '#005F8A', null);
+text('LAYER 4 — API PROXY INTERCEPTOR  (AriaProxyInterceptor.java  ·  ExchangeFilterFunction  ·  Phase 2)', 100, 729, 15, P.white, 'left', true);
+
+const proxyBoxes = [
+  { t:'Intercept outbound\nWebClient call',      c:P.teal },
+  { t:'Read raw JSON body\nfrom Anthropic',       c:P.teal },
+  { t:'Extract usage.*\ntoken counts (exact)',    c:P.teal },
+  { t:'Compute costUsd\nAriaModelPricing',        c:P.tealDark },
+  { t:'Tag: sessionId\nfeatureId · userId',       c:P.tealDark },
+  { t:'CompletableFuture\nasync write (non-block)',c:P.green },
+  { t:'Rebuild ClientResponse\ntransparent passthrough',c:P.slate },
+];
+proxyBoxes.forEach((pb, i) => {
+  const px = 100 + i * 320;
+  roundRect(px, 750, 300, 56, 6, P.navyCard, pb.c, 1.5);
+  const ls = pb.t.split('\n');
+  ls.forEach((l, li) => text(l, px+150, 775+li*20, 12, P.offWhite, 'center'));
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// ARROW: Proxy ↔ Anthropic API
+// ════════════════════════════════════════════════════════════════════════════
+arrow(1200, 815, 1200, 855, P.teal);
+arrow(1200, 915, 1200, 870, P.tealLight); // return arrow offset slightly
+
+// ════════════════════════════════════════════════════════════════════════════
+// LAYER 5 — ANTHROPIC API
+// ════════════════════════════════════════════════════════════════════════════
+shadow();
+roundRect(80, 860, 2240, 100, 10, '#0D1F36', '#003F5C', 2);
+noShadow();
+roundRect(80, 860, 2240, 34, 10, '#003F5C', null);
+text('LAYER 5 — ANTHROPIC API  (External)', 100, 884, 15, P.tealLight, 'left', true);
+
+const models = [
+  { name:'claude-opus-4',    role:'Complex reasoning\nKYC · AML · Compliance',       c:'#7C3AED' },
+  { name:'claude-sonnet-4',  role:'General purpose\nMost sessions (default)',         c:P.teal },
+  { name:'claude-haiku-4-5', role:'Simple Q&A\nOptimizer Rule 1 target',             c:P.green },
+  { name:'Batch API',        role:'After-hours reports\nOptimizer Rule 4 (50% disc)', c:P.amber },
+  { name:'Prompt Cache',     role:'Repeated system prompts\ncache_read_input_tokens', c:P.tealDark },
+];
+models.forEach((m, i) => {
+  const mx = 100 + i * 440;
+  roundRect(mx, 903, 420, 48, 6, P.navyCard, m.c, 1.5);
+  text(m.name, mx + 210, 922, 14, P.white, 'center', true);
+  const rls = m.role.split('\n');
+  rls.forEach((rl, ri) => text(rl, mx+210, 937+ri*14, 11, P.slate, 'center'));
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// ARROWS to Storage
+// ════════════════════════════════════════════════════════════════════════════
+arrow(700, 960, 700, 1000, P.teal);
+arrow(1200, 960, 1200, 1000, P.teal);
+arrow(1700, 960, 1700, 1000, P.teal);
+text('async writes  ·  non-blocking', 1215, 985, 12, P.tealLight, 'left');
+
+// ════════════════════════════════════════════════════════════════════════════
+// LAYER 6 — STORAGE LAYER
+// ════════════════════════════════════════════════════════════════════════════
+shadow();
+roundRect(80, 1005, 2240, 320, 10, P.navyMid, P.tealDark, 2);
+noShadow();
+roundRect(80, 1005, 2240, 34, 10, P.tealDark, null);
+text('LAYER 6 — STORAGE LAYER  (pgvector / PostgreSQL  +  Redis Cache)', 100, 1029, 15, P.white, 'left', true);
+
+// pgvector tables
+const tables = [
+  {
+    name: 'aria_call_records', phase:'Ph 2–4',
+    cols: ['id · session_id · feature_id','user_id · department_id · model','input_tokens · output_tokens','cache_read_tokens · cost_usd','call_index · token_prefix_hash','captured_at'],
+    c: P.teal, w: 350
+  },
+  {
+    name: 'aria_session_summary\n(Materialized View)', phase:'Ph 3',
+    cols: ['session_id · feature_id','total_calls · total_cost_usd','cache_hit_calls · tool_use_calls','session_start · session_end'],
+    c: P.teal, w: 320
+  },
+  {
+    name: 'aria_daily_costs\n(Materialized View)', phase:'Ph 3',
+    cols: ['cost_date · feature_id','department_id · model','total_cost_usd · total_calls','total_cache_read_tokens'],
+    c: P.tealDark, w: 300
+  },
+  {
+    name: 'aria_session_events', phase:'Ph 8',
+    cols: ['event_id · session_id','event_index · event_type','payload (JSONB) · token_count','captured_at'],
+    c: P.purple, w: 290
+  },
+  {
+    name: 'aria_rag_provenance', phase:'Ph 7',
+    cols: ['chunk_id · source_url','ingester_user_id · content_hash','trust_score · flagged','ingest_timestamp'],
+    c: P.amber, w: 290
+  },
+  {
+    name: 'aria_tool_audit', phase:'Ph 7',
+    cols: ['audit_id · session_id','tool_name · payload_hash','outcome · flagged','captured_at'],
+    c: P.amber, w: 265
+  },
+  {
+    name: 'aria_outcome_mappings\n+ aria_allin_cost_config', phase:'Ph 9',
+    cols: ['feature_id · outcome_unit','avg_sessions_per_outcome','governance_multiplier (3×)','business_value_usd'],
+    c: P.green, w: 290
+  },
+];
+
+let tbx = 95;
+tables.forEach((tb) => {
+  const tby = 1048;
+  roundRect(tbx, tby, tb.w, 264, 8, P.navyCard, tb.c, 1.5);
+  roundRect(tbx, tby, tb.w, 28, 4, tb.c, null);
+  const nlines = tb.name.split('\n');
+  nlines.forEach((nl, ni) => text(nl, tbx + tb.w/2, tby+15+ni*14, 12, P.navy, 'center', true));
+  roundRect(tbx + tb.w - 56, tby + 3, 50, 18, 4, 'rgba(0,0,0,0.25)', null);
+  text(tb.phase, tbx + tb.w - 31, tby + 15, 10, P.white, 'center', true);
+  tb.cols.forEach((col, ci) => {
+    roundRect(tbx + 8, tby + 38 + ci*36, tb.w - 16, 28, 4, 'rgba(255,255,255,0.04)', null);
+    text(col, tbx + tb.w/2, tby + 57 + ci*36, 11, P.offWhite, 'center');
+  });
+  tbx += tb.w + 18;
+});
+
+// Redis
+roundRect(tbx, 1048, 230, 264, 8, P.navyCard, P.red, 1.5);
+roundRect(tbx, 1048, 230, 28, 4, P.red, null);
+text('Redis Cache', tbx+115, 1063, 13, P.navy, 'center', true);
+text('Ph 1', tbx+185, 1063, 10, P.navy, 'center', true);
+const redisCols = ['ContextTokenReport\n(in-memory / session)','ConcurrentHashMap\n(ContextTokenService)','Live stats cache\n(3s TTL)'];
+redisCols.forEach((rc, ri) => {
+  roundRect(tbx+8, 1090+ri*60, 214, 50, 4, 'rgba(255,255,255,0.04)', null);
+  const ls = rc.split('\n');
+  ls.forEach((l, li) => text(l, tbx+115, 1112+ri*60+li*16, 11, P.offWhite, 'center'));
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// RIGHT SIDE — SECURITY & VAULT COLUMN
+// ════════════════════════════════════════════════════════════════════════════
+// AriaCredentialVault
+shadow();
+roundRect(1970, 465, 350, 200, 10, P.navyCard, P.purple, 2);
+noShadow();
+roundRect(1970, 465, 350, 30, 6, P.purple, null);
+text('AriaCredentialVault  (Ph 8)', 2145, 484, 13, P.white, 'center', true);
+const vaultItems = ['Session token handles\n(opaque refs to secrets)','AWS Secrets Manager\n/ Vault / env vars','Credentials NEVER reach\nagent or tool env'];
+vaultItems.forEach((vi, i) => {
+  roundRect(1982, 503+i*52, 326, 44, 5, 'rgba(124,58,237,0.15)', null);
+  const ls = vi.split('\n');
+  ls.forEach((l, li) => text(l, 2145, 521+i*52+li*16, 11, P.tealLight, 'center'));
+});
+
+// AriaMcpProxy
+shadow();
+roundRect(1970, 680, 350, 130, 10, P.navyCard, P.purple, 2);
+noShadow();
+roundRect(1970, 680, 350, 30, 6, P.purple, null);
+text('AriaMcpProxy  (Ph 8)', 2145, 699, 13, P.white, 'center', true);
+['Intercepts all MCP calls','Fetches OAuth token from vault','Token never seen by harness'].forEach((mi, i) => {
+  text('→  '+mi, 1985, 727+i*22, 12, P.tealLight, 'left');
+});
+
+// AriaCircuitBreaker
+shadow();
+roundRect(1970, 830, 350, 120, 10, P.navyCard, P.amber, 2);
+noShadow();
+roundRect(1970, 830, 350, 30, 6, P.amber, null);
+text('AriaCircuitBreaker  (Ph 7)', 2145, 849, 13, P.navy, 'center', true);
+['Rolling window: 15 calls/min','OPEN → halt session + audit log','Configured via application.yml'].forEach((ci, i) => {
+  text('→  '+ci, 1985, 877+i*22, 12, P.tealLight, 'left');
+});
+
+// AriaSystemicGuard
+shadow();
+roundRect(1970, 970, 350, 120, 10, P.navyCard, P.amber, 2);
+noShadow();
+roundRect(1970, 970, 350, 30, 6, P.amber, null);
+text('AriaSystemicGuard  (Ph 7)', 2145, 989, 13, P.navy, 'center', true);
+['@Scheduled every 60s','5× baseline spike = anomaly','2+ tenants → CRITICAL alert'].forEach((si, i) => {
+  text('→  '+si, 1985, 1017+i*22, 12, P.tealLight, 'left');
+});
+
+// Dashed arrows from security components to main flow
+arrow(1970, 565, 1780, 565, P.purple, true);
+arrow(1970, 745, 1780, 720, P.purple, true);
+
+// ════════════════════════════════════════════════════════════════════════════
+// BOTTOM — KEY DATA FLOWS LEGEND
+// ════════════════════════════════════════════════════════════════════════════
+roundRect(80, 1340, 2240, 220, 10, P.navyCard, P.tealDark, 1.5);
+roundRect(80, 1340, 2240, 34, 8, P.tealDark, null);
+text('KEY DATA FLOWS & COMPONENT DEPENDENCIES', 100, 1364, 15, P.white, 'left', true);
+
+const flows = [
+  { color: P.teal,   label: 'Hot path (LLM call)',      desc: 'User → AgentService → Optimizer → Proxy → Anthropic API → back to User  (synchronous, <2s)' },
+  { color: P.green,  label: 'Async cost capture',       desc: 'Proxy → CompletableFuture.runAsync() → aria_call_records  (non-blocking, ~50ms)' },
+  { color: P.purple, label: 'Security boundary',        desc: 'Credentials: Vault → MCP Proxy only.  Never reach AgentService or tool sandbox.' },
+  { color: P.tealLight, label: 'Session context',       desc: 'AriaSessionContext ThreadLocal: set at agent entry, read by Proxy + Optimizer, cleared in finally{}' },
+  { color: P.amber,  label: 'Optimizer intercept',      desc: 'Pre-call: evaluate 7 rules → PROCEED / ROUTE_MODEL / CACHE / THROTTLE / DEFER_BATCH / LAZY_INIT' },
+];
+
+flows.forEach((f, i) => {
+  const fy = 1388 + i*38;
+  // color line
+  ctx.strokeStyle = f.color;
+  ctx.lineWidth = 3;
+  ctx.setLineDash([]);
+  ctx.beginPath(); ctx.moveTo(105, fy+10); ctx.lineTo(155, fy+10); ctx.stroke();
+  // arrowhead
+  ctx.fillStyle = f.color;
+  ctx.beginPath();
+  ctx.moveTo(155, fy+10);
+  ctx.lineTo(143, fy+4);
+  ctx.lineTo(143, fy+16);
+  ctx.closePath(); ctx.fill();
+  text(f.label, 165, fy+15, 13, f.color, 'left', true);
+  text(f.desc, 400, fy+15, 13, P.slate, 'left');
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// PHASE LEGEND (bottom right)
+// ════════════════════════════════════════════════════════════════════════════
+const phaseLegend = [
+  { phase:'Ph 1', label:'Context Window Monitor',    c:P.teal },
+  { phase:'Ph 2', label:'API Proxy Interceptor',     c:P.teal },
+  { phase:'Ph 3', label:'pgvector Trajectory Store', c:P.teal },
+  { phase:'Ph 4', label:'Cost Intelligence APIs',    c:P.teal },
+  { phase:'Ph 5', label:'Active Optimizer Engine',   c:P.tealDark },
+  { phase:'Ph 6', label:'React FinOps Dashboard',    c:P.tealDark },
+  { phase:'Ph 7', label:'Agent Trap Hardening',      c:P.amber },
+  { phase:'Ph 8', label:'Managed Agent Architecture',c:P.purple },
+  { phase:'Ph 9', label:'Business Outcome FinOps',   c:P.green },
+];
+
+const legX = 1380;
+const legY = 1390;
+text('PHASE MAP', legX, legY-10, 13, P.tealLight, 'left', true);
+phaseLegend.forEach((pl, i) => {
+  const col = Math.floor(i/5);
+  const row = i % 5;
+  const px = legX + col * 430;
+  const py = legY + row * 32;
+  roundRect(px, py, 42, 20, 4, pl.c, null);
+  text(pl.phase, px+21, py+14, 10, P.navy, 'center', true);
+  text(pl.label, px+50, py+14, 12, P.offWhite, 'left');
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// Footer
+// ════════════════════════════════════════════════════════════════════════════
+ctx.strokeStyle = P.tealDark;
+ctx.lineWidth = 1;
+ctx.setLineDash([]);
+ctx.beginPath(); ctx.moveTo(80, 1575); ctx.lineTo(2320, 1575); ctx.stroke();
+text('ARIA Cost Intelligence Platform  ·  Implementation Guide v1.3  ·  June 2026  ·  Stack: Spring Boot 3 + Spring AI + pgvector + React', 1200, 1594, 13, P.slate, 'center', false, true);
+
+// Convert to PNG
+const PNG = cv.toDataURL('image/png');
+document.body.setAttribute('data-uri', PNG);
+</script>
+</body>
+</html>
