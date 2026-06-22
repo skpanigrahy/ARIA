@@ -1,0 +1,458 @@
+Interactive Agent Memory Explainer
+Here's a complete, self-contained HTML file you can save and open in any browser. It visualizes the 7 memory types with clickable layers and animated scenario runs.
+html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>The 7 Types of Agent Memory — Interactive Explainer</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    color: #e2e8f0;
+    min-height: 100vh;
+    padding: 24px;
+  }
+  .container { max-width: 1200px; margin: 0 auto; }
+  h1 {
+    font-size: 28px;
+    margin-bottom: 8px;
+    background: linear-gradient(90deg, #60a5fa, #c084fc);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .subtitle { color: #94a3b8; margin-bottom: 24px; font-size: 14px; }
+  .layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+  @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+
+  .panel {
+    background: rgba(30, 41, 59, 0.6);
+    border: 1px solid rgba(148, 163, 184, 0.15);
+    border-radius: 12px;
+    padding: 20px;
+    backdrop-filter: blur(10px);
+  }
+  .panel h2 { font-size: 16px; margin-bottom: 16px; color: #f1f5f9; }
+
+  /* Memory stack */
+  .stack { display: flex; flex-direction: column; gap: 6px; }
+  .layer {
+    padding: 14px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: all 0.3s ease;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .layer:hover { transform: translateX(4px); }
+  .layer .num {
+    font-weight: 700;
+    font-size: 13px;
+    opacity: 0.8;
+    margin-right: 12px;
+  }
+  .layer .name { font-weight: 600; font-size: 14px; }
+  .layer .meta { font-size: 12px; opacity: 0.7; }
+  .layer.active {
+    border-color: #fff;
+    box-shadow: 0 0 24px rgba(255,255,255,0.4);
+    transform: translateX(8px) scale(1.02);
+  }
+  .layer.selected {
+    border-color: #fbbf24;
+    box-shadow: 0 0 16px rgba(251, 191, 36, 0.5);
+  }
+
+  /* Layer colors */
+  .layer[data-id="1"] { background: linear-gradient(90deg, #fbbf24, #f59e0b); color: #1e293b; }
+  .layer[data-id="2"] { background: linear-gradient(90deg, #3b82f6, #2563eb); }
+  .layer[data-id="3"] { background: linear-gradient(90deg, #a855f7, #9333ea); }
+  .layer[data-id="4"] { background: linear-gradient(90deg, #10b981, #059669); }
+  .layer[data-id="5"] { background: linear-gradient(90deg, #06b6d4, #0891b2); }
+  .layer[data-id="6"] { background: linear-gradient(90deg, #ef4444, #dc2626); }
+  .layer[data-id="7"] { background: linear-gradient(90deg, #ec4899, #db2777); }
+
+  /* Details panel */
+  .details {
+    background: rgba(15, 23, 42, 0.8);
+    border-radius: 8px;
+    padding: 16px;
+    min-height: 180px;
+    border-left: 4px solid #60a5fa;
+  }
+  .details h3 { font-size: 18px; margin-bottom: 12px; color: #fbbf24; }
+  .details .row { margin-bottom: 8px; font-size: 13px; line-height: 1.5; }
+  .details .label { color: #94a3b8; font-weight: 600; display: inline-block; min-width: 110px; }
+  .details .value { color: #e2e8f0; }
+  .details .example {
+    margin-top: 12px;
+    padding: 10px;
+    background: rgba(96, 165, 250, 0.1);
+    border-radius: 6px;
+    font-family: "SF Mono", Monaco, monospace;
+    font-size: 12px;
+    color: #93c5fd;
+  }
+
+  /* Scenarios */
+  .scenarios { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  .scenario-btn {
+    padding: 8px 14px;
+    background: rgba(96, 165, 250, 0.15);
+    border: 1px solid rgba(96, 165, 250, 0.3);
+    color: #93c5fd;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.2s;
+  }
+  .scenario-btn:hover { background: rgba(96, 165, 250, 0.3); }
+  .scenario-btn.active { background: #3b82f6; color: white; border-color: #3b82f6; }
+
+  .user-msg {
+    background: rgba(16, 185, 129, 0.1);
+    border-left: 3px solid #10b981;
+    padding: 10px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    margin-bottom: 12px;
+    font-style: italic;
+  }
+
+  .trace {
+    max-height: 260px;
+    overflow-y: auto;
+    font-family: "SF Mono", Monaco, monospace;
+    font-size: 12px;
+    line-height: 1.7;
+  }
+  .trace-step {
+    padding: 6px 10px;
+    margin-bottom: 4px;
+    border-radius: 4px;
+    opacity: 0;
+    transform: translateX(-10px);
+    animation: slideIn 0.4s ease forwards;
+  }
+  @keyframes slideIn {
+    to { opacity: 1; transform: translateX(0); }
+  }
+  .trace-step .step-num {
+    display: inline-block;
+    width: 22px;
+    height: 22px;
+    line-height: 22px;
+    text-align: center;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.15);
+    margin-right: 8px;
+    font-weight: 700;
+  }
+  .replay-btn {
+    margin-top: 12px;
+    padding: 8px 16px;
+    background: rgba(251, 191, 36, 0.2);
+    border: 1px solid #fbbf24;
+    color: #fbbf24;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  .replay-btn:hover { background: rgba(251, 191, 36, 0.3); }
+
+  .hint { font-size: 12px; color: #64748b; margin-top: 8px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🧠 The 7 Types of Agent Memory</h1>
+  <p class="subtitle">Click any layer to inspect it. Run a scenario to watch memory activate in order.</p>
+
+  <div class="layout">
+    <!-- LEFT: Stack + Details -->
+    <div class="panel">
+      <h2>Memory Stack</h2>
+      <div class="stack" id="stack"></div>
+
+      <div style="margin-top: 20px;">
+        <h2 style="font-size: 14px; margin-bottom: 10px;">Layer Details</h2>
+        <div class="details" id="details">
+          <p style="color: #64748b; font-size: 13px;">👈 Click any layer to see what it stores, where it lives, and how it's implemented.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Scenarios + Trace -->
+    <div class="panel">
+      <h2>Run a Scenario</h2>
+      <div class="scenarios" id="scenarios"></div>
+      <div class="user-msg" id="userMsg">Pick a scenario above to begin.</div>
+
+      <h2 style="font-size: 14px; margin-top: 16px; margin-bottom: 10px;">Execution Trace</h2>
+      <div class="trace" id="trace">
+        <p style="color: #64748b; font-size: 12px;">No scenario running yet.</p>
+      </div>
+      <button class="replay-btn" onclick="replayScenario()">↻ Replay</button>
+      <p class="hint">The stack lights up in the order each memory layer is used.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+// ---- Data: The 7 memory types ----
+const layers = [
+  {
+    id: 1, name: "In-Context / Working", short: "Working",
+    timescale: "Short-term",
+    where: "Context window",
+    stores: "System prompt, recent messages, tool outputs, reasoning steps",
+    impl: "Native to the LLM — it's the RAM of the agent",
+    example: "The last 5 messages in a chat session."
+  },
+  {
+    id: 2, name: "Semantic", short: "Semantic",
+    timescale: "Long-term",
+    where: "External vector DB or profile schema",
+    stores: "Facts, preferences, domain knowledge decoupled from when learned",
+    impl: "Key-value store or vector DB with user profile",
+    example: "\"User is allergic to gluten\" — persists across sessions."
+  },
+  {
+    id: 3, name: "Episodic", short: "Episodic",
+    timescale: "Long-term",
+    where: "External event log / vector DB",
+    stores: "Past events, full conversations, task runs, outcomes",
+    impl: "Reflexion / ExpeL-style post-mortems + similarity search",
+    example: "\"Last month, the risk section landed well — repeat that structure.\""
+  },
+  {
+    id: 4, name: "Procedural", short: "Procedural",
+    timescale: "Long-term",
+    where: "System prompt or model weights",
+    stores: "Skills, tool usage patterns, workflows, behavioral rules",
+    impl: "System prompt templates or fine-tuning",
+    example: "Password-reset flow: verify → reset → confirm → email."
+  },
+  {
+    id: 5, name: "External / Retrieval", short: "Retrieval",
+    timescale: "Short + Long-term",
+    where: "Vector database",
+    stores: "Documents, history chunks pulled at inference time",
+    impl: "RAG pipeline: embed → retrieve → inject",
+    example: "Pulling the top-3 relevant docs for a user question."
+  },
+  {
+    id: 6, name: "Parametric", short: "Parametric",
+    timescale: "Long-term",
+    where: "Model weights",
+    stores: "Language, reasoning patterns, general world knowledge",
+    impl: "Pre-training or fine-tuning (frozen at training time)",
+    example: "Knowing that Python uses indentation — no lookup needed."
+  },
+  {
+    id: 7, name: "Prospective", short: "Prospective",
+    timescale: "Short + Long-term",
+    where: "State store / task queue",
+    stores: "Future intentions, scheduled goals, pending commitments",
+    impl: "Scheduler, cron job, or task queue (e.g., Celery)",
+    example: "\"Send Friday report\" — remembered until execution."
+  }
+];
+
+// ---- Scenarios ----
+const scenarios = [
+  {
+    title: "Suggest a recipe",
+    msg: "User: \"Suggest a quick dinner for tonight.\"",
+    steps: [
+      { layer: 1, text: "Working memory loads the current query into context." },
+      { layer: 6, text: "Parametric memory supplies language + culinary reasoning." },
+      { layer: 2, text: "Semantic memory recalls: user is vegetarian." },
+      { layer: 4, text: "Procedural memory executes the 'suggest_recipe' skill." },
+      { layer: 1, text: "Working memory assembles the final response." }
+    ]
+  },
+  {
+    title: "Remember me next time",
+    msg: "User: \"I'm allergic to gluten — remember that.\"",
+    steps: [
+      { layer: 1, text: "Working memory holds the new statement in context." },
+      { layer: 6, text: "Parametric memory understands the sentence." },
+      { layer: 2, text: "Semantic memory WRITES the allergy fact for future sessions." },
+      { layer: 1, text: "Working memory confirms: 'Got it — saved.'" }
+    ]
+  },
+  {
+    title: "Book a trip",
+    msg: "User: \"Book me a flight to Tokyo next month.\"",
+    steps: [
+      { layer: 1, text: "Working memory loads the booking request." },
+      { layer: 2, text: "Semantic memory recalls: user prefers window seats, vegan meals." },
+      { layer: 5, text: "Retrieval memory pulls live flight data from external API/DB." },
+      { layer: 4, text: "Procedural memory runs the flow: search → compare → reserve → confirm." },
+      { layer: 6, text: "Parametric memory handles natural-language confirmation." }
+    ]
+  },
+  {
+    title: "Improve from past runs",
+    msg: "Agent: \"Let me write a better report this time.\"",
+    steps: [
+      { layer: 1, text: "Working memory loads the current task." },
+      { layer: 3, text: "Episodic memory recalls: 'Risk sections worked well last month.'" },
+      { layer: 2, text: "Semantic memory provides user's preferred report format." },
+      { layer: 5, text: "Retrieval memory pulls prior successful reports as reference." },
+      { layer: 6, text: "Parametric memory synthesizes a stronger draft." },
+      { layer: 3, text: "Episodic memory logs this run's outcome for next time." }
+    ]
+  },
+  {
+    title: "Long-horizon project",
+    msg: "Agent: \"Manage a week-long research project.\"",
+    steps: [
+      { layer: 1, text: "Working memory holds the current planning step." },
+      { layer: 7, text: "Prospective memory schedules: 'Send Friday report', 'Monday review'." },
+      { layer: 4, text: "Procedural memory drives the project workflow." },
+      { layer: 2, text: "Semantic memory stores stakeholder preferences." },
+      { layer: 3, text: "Episodic memory recalls what worked in past projects." },
+      { layer: 5, text: "Retrieval memory pulls relevant research papers." },
+      { layer: 6, text: "Parametric memory provides base reasoning throughout." }
+    ]
+  }
+];
+
+// ---- Render stack ----
+const stackEl = document.getElementById('stack');
+layers.forEach(l => {
+  const div = document.createElement('div');
+  div.className = 'layer';
+  div.dataset.id = l.id;
+  div.innerHTML = `
+    <div>
+      <span class="num">${l.id}</span>
+      <span class="name">${l.name}</span>
+    </div>
+    <span class="meta">${l.timescale}</span>
+  `;
+  div.onclick = () => selectLayer(l.id);
+  stackEl.appendChild(div);
+});
+
+// ---- Render scenario buttons ----
+const scenariosEl = document.getElementById('scenarios');
+scenarios.forEach((s, i) => {
+  const btn = document.createElement('button');
+  btn.className = 'scenario-btn';
+  btn.textContent = s.title;
+  btn.onclick = () => runScenario(i);
+  scenariosEl.appendChild(btn);
+});
+
+// ---- Select layer (show details) ----
+let selectedLayerId = null;
+function selectLayer(id) {
+  selectedLayerId = id;
+  document.querySelectorAll('.layer').forEach(el => el.classList.remove('selected'));
+  document.querySelector(`.layer[data-id="${id}"]`).classList.add('selected');
+  const l = layers.find(x => x.id === id);
+  document.getElementById('details').innerHTML = `
+    <h3>${l.id}. ${l.name}</h3>
+    <div class="row"><span class="label">Timescale:</span><span class="value">${l.timescale}</span></div>
+    <div class="row"><span class="label">Lives in:</span><span class="value">${l.where}</span></div>
+    <div class="row"><span class="label">Stores:</span><span class="value">${l.stores}</span></div>
+    <div class="row"><span class="label">Implementation:</span><span class="value">${l.impl}</span></div>
+    <div class="example">💡 ${l.example}</div>
+  `;
+}
+
+// ---- Run scenario ----
+let currentScenarioIdx = null;
+let traceTimer = null;
+
+function runScenario(idx) {
+  if (traceTimer) clearTimeout(traceTimer);
+  currentScenarioIdx = idx;
+  const s = scenarios[idx];
+
+  // Highlight active button
+  document.querySelectorAll('.scenario-btn').forEach((b, i) => {
+    b.classList.toggle('active', i === idx);
+  });
+  document.getElementById('userMsg').textContent = s.msg;
+
+  // Clear previous
+  document.querySelectorAll('.layer').forEach(el => el.classList.remove('active'));
+  const traceEl = document.getElementById('trace');
+  traceEl.innerHTML = '';
+
+  // Animate steps
+  s.steps.forEach((step, i) => {
+    traceTimer = setTimeout(() => {
+      // Light up layer
+      document.querySelectorAll('.layer').forEach(el => el.classList.remove('active'));
+      document.querySelector(`.layer[data-id="${step.layer}"]`).classList.add('active');
+
+      // Add trace step
+      const l = layers.find(x => x.id === step.layer);
+      const div = document.createElement('div');
+      div.className = 'trace-step';
+      div.style.background = `rgba(255,255,255,0.05)`;
+      div.innerHTML = `<span class="step-num">${i+1}</span><strong>${l.short}:</strong> ${step.text}`;
+      traceEl.appendChild(div);
+      traceEl.scrollTop = traceEl.scrollHeight;
+    }, i * 900);
+  });
+
+  // Fade out last layer after trace completes
+  traceTimer = setTimeout(() => {
+    document.querySelectorAll('.layer').forEach(el => el.classList.remove('active'));
+  }, s.steps.length * 900 + 1500);
+}
+
+function replayScenario() {
+  if (currentScenarioIdx !== null) runScenario(currentScenarioIdx);
+}
+</script>
+</body>
+</html>
+How to use it
+Save the code above as agent-memory.html
+Open it in any modern browser (Chrome, Firefox, Safari, Edge)
+Interact:
+Click any layer in the stack → the right panel shows what it stores, where it lives, timescale, implementation, and a concrete example
+Click a scenario (Suggest a recipe, Remember me next time, etc.) → the stack lights up layer-by-layer in activation order, and an execution trace appears on the right
+Replay button re-runs the last scenario
+What each scenario demonstrates
+Scenario
+Key memory types activated
+Lesson
+Suggest a recipe
+Working → Parametric → Semantic → Procedural
+Short session needs mostly working + procedural memory
+Remember me next time
+Working → Parametric → Semantic (write)
+Semantic memory is the write path for user facts
+Book a trip
+Working → Semantic → Retrieval → Procedural
+Real-world data requires retrieval memory
+Improve from past runs
+Working → Episodic → Semantic → Retrieval
+Episodic memory enables learning from experience
+Long-horizon project
+All 7 layers
+Complex agents need the full stack, especially prospective
+Design notes
+Color-coded layers — each memory type has a distinct gradient so you can visually track which is active
+Sequential animation (900ms per step) — matches the real order of memory activation, not just a static list
+Self-contained — no external libraries, no build step, works offline
+Responsive — collapses to single column on mobile
+You can extend it easily: add more scenarios by appending to the scenarios array, or add a "build order" tab showing which memory to add first (per the article's "Practical Build Order" section).
