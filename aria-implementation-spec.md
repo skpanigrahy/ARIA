@@ -1,604 +1,350 @@
-# ARIA Agent PR Governance Layer — Implementation Specification
-## For Claude Code / GitHub Copilot
+# ARIA Implementation Spec: Reasoning-Boundary Contracts, TRAJECTORY_INTEGRITY, and EVAL_RELIABILITY
+
+**Audience:** implementing engineer / coding agent (Copilot).
+**Scope:** three related pieces of work against the ARIA trust-scoring layer:
+
+- **Part A** — a cross-cutting contract-and-validation framework that every TrustScore dimension must follow (this is a constraint on all dimensions, not a standalone feature).
+- **Part B** — TRAJECTORY_INTEGRITY, the 6th TrustScore dimension (runtime trajectory anomaly detection).
+- **Part C** — EVAL_RELIABILITY, the 5th TrustScore dimension (LLM-as-Judge reliability scoring via AgentEvalJudge + EvalHarness).
+
+Everything below is written as an implementation contract: data shapes, validation rules, failure policy, and acceptance criteria. Where a decision depends on details not specified here (exact ReasoningBank schema, exact gateway auth flow, existing package layout), leave a `// TODO(spec-gap):` comment rather than guessing — do not invent business logic silently.
 
 ---
 
-## Context and Purpose
+## Part A — Reasoning-Boundary Contract Framework (applies to every dimension)
 
-This specification instructs the AI coding assistant to implement ARIA's **Agent PR Governance Layer** — a set of Spring Boot components that intercept, evaluate, and govern pull requests raised by AI agents (specifically `AutoFixAgent`) within the ACES platform at JPMorgan Chase.
+### A.1 Governing rule
 
-**Do not invent architecture.** Follow this specification exactly. Every component named here maps to an existing ARIA module. If a dependency is not listed, do not add it.
+Every TrustScore dimension computation is decomposed into three layers, and each layer has a hard rule:
 
----
+| Layer | What belongs here | Rule |
+|---|---|---|
+| Deterministic code | retrieval, arithmetic, threshold checks, state transitions, weighting/aggregation | Must be pure functions wherever possible. No LLM call may compute a numeric score directly. |
+| Bounded inner model | classification/extraction from unstructured input only (e.g. judge rationale text, log text, trajectory commentary) | Output MUST be schema-validated before use. Never trusted implicitly. |
+| Orchestration | wires the above together, owns retry/escalate policy, owns observability | Lives in the dimension's `*Evaluator` / `*Service` class. |
 
-## Technology Stack
+**Non-negotiable constraint:** no TrustScore dimension's final numeric value may be a field an LLM populated directly. LLMs populate *evidence* (categorical judgments, findings, references). Code combines evidence into scores using fixed, versioned formulas.
 
-| Layer | Technology |
-|---|---|
-| Language | Java 21 (use records, sealed interfaces, pattern matching) |
-| Framework | Spring Boot 3.3 |
-| AI Orchestration | Spring AI 1.0 GA |
-| Database (primary) | PostgreSQL 16 + pgvector extension |
-| Database (JPMC private) | Oracle 23ai via direct JDBC (no JPA — use JdbcTemplate) |
-| Time-series | TimescaleDB (extends PostgreSQL, same datasource) |
-| Cache | Redis 7 |
-| Build | Maven |
-| Logging | SLF4J + Logback structured JSON |
-| Testing | JUnit 5, Mockito, Testcontainers |
+### A.2 Universal typed-output contract
 
----
-
-## Module Structure
-
-```
-aria-core/
-├── src/main/java/com/jpmc/aces/aria/
-│   ├── model/
-│   │   ├── TrustScore.java
-│   │   ├── TrustTier.java
-│   │   ├── AgentAction.java
-│   │   ├── AgentContext.java
-│   │   ├── ActionType.java
-│   │   └── AdvisoryResult.java
-│   ├── advisors/
-│   │   ├── AgentActionAdvisor.java          (interface)
-│   │   ├── CIIntegrityAdvisor.java
-│   │   ├── SemanticDeduplicationAdvisor.java
-│   │   └── BehavioralTraceAdvisor.java
-│   ├── governors/
-│   │   ├── AgentActionGovernor.java         (interface)
-│   │   └── PRScopeGovernor.java
-│   ├── filters/
-│   │   ├── AgentInvocationFilter.java       (interface)
-│   │   └── PromptIntegrityFilter.java
-│   ├── gateway/
-│   │   └── AriaGovernanceGateway.java
-│   ├── scoring/
-│   │   ├── TrustScoreService.java
-│   │   └── TrustScoreContributor.java
-│   └── repository/
-│       ├── TrustScoreRepository.java
-│       ├── CIBaselineRepository.java
-│       └── CodeIndexRepository.java
-└── src/test/java/com/jpmc/aces/aria/
-    ├── advisors/
-    │   ├── CIIntegrityAdvisorTest.java
-    │   ├── SemanticDeduplicationAdvisorTest.java
-    │   └── BehavioralTraceAdvisorTest.java
-    ├── governors/
-    │   └── PRScopeGovernorTest.java
-    └── filters/
-        └── PromptIntegrityFilterTest.java
-```
-
----
-
-## Component 1: Core Domain Models
-
-### 1.1 `TrustScore.java`
+Every bounded LLM call in ARIA (AgentEvalJudge included) must return an object satisfying this shape — implement as a Java `record` (Spring AI structured output) and mirror as a Pydantic model on any Python-side service (e.g. the trajectory microservice) for cross-service consistency:
 
 ```java
-package com.jpmc.aces.aria.model;
+// Java 21 record — canonical contract for any bounded inner-LLM output in ARIA
+public record ModelFinding<T>(
+    T category,                    // must be a closed enum, never free text
+    String summary,                // length-capped, see A.4
+    List<String> evidenceIds,      // MUST reference IDs that exist in source data
+    double rawModelConfidence,     // captured for observability ONLY — never used in scoring
+    boolean requiresEscalation     // model may flag uncertainty; code decides what to do with it
+) {}
+```
 
-import java.time.Instant;
+```python
+# Python mirror (pydantic) — trajectory service / any FastAPI component
+class ModelFinding(BaseModel):
+    category: Literal[...]          # closed enum per use site
+    summary: str = Field(max_length=500)
+    evidence_ids: list[str]
+    raw_model_confidence: float     # observability only, never scoring input
+    requires_escalation: bool
+```
 
-/**
- * Multi-dimensional trust score for an agent session.
- * All dimensions are 0.0–1.0. Composite is weighted.
- * This is a value object — immutable, no JPA annotations.
- */
-public record TrustScore(
-    double behavioral,
-    double structural,
-    double integrity,
-    double budgetAdherence,
-    Instant evaluatedAt
-) {
-    public double composite() {
-        return (behavioral * 0.25)
-             + (structural * 0.25)
-             + (integrity * 0.35)
-             + (budgetAdherence * 0.15);
-    }
+Key point: `rawModelConfidence` / `raw_model_confidence` is captured and logged but **must never appear in a scoring formula**. It exists for observability/drift-detection only (see A.6). This directly encodes the "evidence over confidence" rule — evidence IDs are falsifiable, self-reported confidence is not.
 
-    public TrustTier tier() {
-        double score = composite();
-        if (score >= 0.85) return TrustTier.TRUSTED;
-        if (score >= 0.70) return TrustTier.MONITORED;
-        if (score >= 0.50) return TrustTier.RESTRICTED;
-        return TrustTier.SUSPENDED;
-    }
+### A.3 Provenance separation
 
-    // Builder pattern for score updates — do not use setters
-    public TrustScore withBehavioral(double value) {
-        return new TrustScore(value, structural, integrity, budgetAdherence, Instant.now());
-    }
-    public TrustScore withIntegrity(double value) {
-        return new TrustScore(behavioral, structural, value, budgetAdherence, Instant.now());
-    }
-    public TrustScore withStructural(double value) {
-        return new TrustScore(behavioral, value, integrity, budgetAdherence, Instant.now());
-    }
-    public TrustScore withBudgetAdherence(double value) {
-        return new TrustScore(behavioral, structural, integrity, value, Instant.now());
-    }
+Every dimension's assessment object must separate **measured** fields from **interpreted** fields at the type level — not by convention, by distinct field groups with a naming/structuring rule:
 
-    public static TrustScore defaultScore() {
-        return new TrustScore(0.70, 0.70, 0.70, 0.70, Instant.now());
-    }
+```java
+public record DimensionAssessment(
+    String subjectId,               // agent/trajectory/eval-run id
+    Map<String, Double> measured,   // computed by code — trust unconditionally
+    List<ModelFinding<?>> findings, // produced by a bounded LLM — treat as claims
+    double score,                   // computed ONLY from `measured` + validated `findings`
+    List<String> incompleteSources, // never silently empty — see A.5
+    String scoringFormulaVersion    // required for reproducibility / audit
+) {}
+```
+
+`scoringFormulaVersion` is mandatory on every assessment. If the weighting formula changes, old assessments must remain interpretable against the version that produced them — this is what makes a TrustScore auditable after the fact.
+
+### A.4 Validation checklist (implement as a single reusable validator, not per-dimension copies)
+
+Build one shared component, e.g. `ModelFindingValidator`, used by every dimension:
+
+```java
+public interface ModelFindingValidator<T> {
+    ValidationResult validate(ModelFinding<T> finding, SourceData sourceData);
 }
 ```
 
-### 1.2 `TrustTier.java`
+`ValidationResult` must check, in this order (fail fast, record which check failed):
+
+1. **Enum membership** — `category` is one of the declared closed values. Anything else is a hard failure, not a warning.
+2. **Evidence existence** — every ID in `evidenceIds` exists in `sourceData` as supplied to the model call. This is the highest-leverage check; do not skip it for latency reasons.
+3. **Length bound** — `summary` is within its declared cap. Reject, don't truncate silently (truncation hides prompt-injection payloads instead of surfacing them).
+4. **Schema completeness** — all required fields present, no field silently defaulted.
+5. **No out-of-schema content** — if using a raw JSON parse step before deserialization, reject any response containing content outside the expected JSON object (leaked reasoning traces, instructions, markdown fencing left over).
+
+`ValidationResult` shape:
 
 ```java
-package com.jpmc.aces.aria.model;
+public record ValidationResult(
+    boolean valid,
+    List<String> failedChecks,     // empty if valid
+    FailurePolicy appliedPolicy    // set by caller, see A.5
+) {}
+```
 
-public enum TrustTier {
-    TRUSTED,      // >= 0.85: auto-merge permitted
-    MONITORED,    // 0.70–0.84: human review required before merge
-    RESTRICTED,   // 0.50–0.69: propose-only, no direct writes
-    SUSPENDED;    // < 0.50: no actions, human intervention required
+### A.5 Failure policy (retry / fallback / escalate)
 
-    public boolean canAutoMerge() { return this == TRUSTED; }
-    public boolean requiresReview() { return this == MONITORED; }
-    public boolean isOperational() { return this == TRUSTED || this == MONITORED; }
+Do not hardcode one global behavior. Each call site declares its policy explicitly:
+
+```java
+public enum FailurePolicy {
+    RETRY_ONCE,          // corrective re-prompt, then apply next policy in chain if still invalid
+    FALLBACK_UNKNOWN,    // return a category="unknown" finding, log clearly, continue
+    ESCALATE_TO_HUMAN    // block automated action, raise for governance review
 }
 ```
 
-### 1.3 `ActionType.java`
+Rule of thumb for choosing: `ESCALATE_TO_HUMAN` for anything feeding a rollback/auto-merge/auto-block decision; `FALLBACK_UNKNOWN` for anything advisory-only; `RETRY_ONCE` as a first attempt before either of the above, never as the last resort on its own.
+
+**Never** pass a `ModelFinding` that failed validation into a scoring formula. This must be enforced structurally — `DimensionAssessment.findings` should only be constructible from already-validated findings (private constructor + factory that requires a `ValidationResult.valid == true`, or equivalent).
+
+Also track `incompleteSources` explicitly at every layer: a timeout fetching trajectory events is `incompleteSources=["trajectory-events"]`, never silently folded into "score computed normally." A dimension score computed on incomplete evidence must be visibly marked as such downstream, not presented with the same confidence as a complete one.
+
+### A.6 Observability — required fields on every bounded LLM call
+
+Every call to AgentEvalJudge or any other bounded model step must log, at minimum:
+
+- model identifier + prompt/template version
+- input token count, output token count
+- latency (ms)
+- retry count and which policy branch was taken
+- validation result (pass/fail + failed checks list)
+- evidence IDs returned
+- `rawModelConfidence` (for drift monitoring, never for scoring)
+- final `DimensionAssessment.scoringFormulaVersion` it fed into
+
+Emit these as structured log events (or metrics + trace spans if ARIA already has an observability pipeline) keyed by `subjectId` so a reviewer can reconstruct exactly what evidence produced a given TrustScore.
+
+### A.7 Testing requirement per layer
+
+- Deterministic code (weighting, thresholds, aggregation): standard unit tests, one assertion per rule, no flakiness tolerated.
+- `ModelFindingValidator`: table-driven tests covering each of the 5 checks in A.4, both pass and fail cases.
+- Bounded LLM call (AgentEvalJudge, trajectory classifier if any): a versioned evaluation set — fixed inputs with known-correct categorical labels — re-run on every model/prompt version bump, not just at initial build. Track invalid-output rate and escalation rate as first-class metrics, not just accuracy.
+- Full chain: integration tests that assert the *chain's* output is correct, not just each layer in isolation — a fluent wrong answer three layers upstream is the actual production risk (see closing note).
+
+---
+
+## Part B — TRAJECTORY_INTEGRITY (6th TrustScore dimension)
+
+### B.1 Purpose
+
+Detect and localize anomalies in an agent's runtime execution trajectory (its sequence of tool calls, intermediate states, and decisions), and support rollback-and-retry when an anomaly is confirmed. This dimension is **entirely statistical/deterministic** — it must not use an LLM to judge "does this trajectory look anomalous." That question has a fixed, learnable answer given a trained model, which is precisely the "can this be specified completely, given a trained detector" case from Part A.2 — it belongs to code (a trained statistical model), not to a general-purpose LLM asked to eyeball a sequence.
+
+### B.2 Architecture
+
+```
+Agent trajectory (sequence of TrajectoryEvent)
+        |
+        v
+Reservoir encoder (fixed, untrained-recurrent-projection) -> fixed-length embedding per step
+        |
+        v
+Ridge regression anomaly scorer -> per-step anomaly score (continuous)
+        |
+        v
+Thresholding + localization -> which step(s) triggered, confirmed anomaly True/False
+        |
+        v
+TrajectoryAssessment (typed, per Part A.3)
+        |
+        v
+Rollback-and-retry decision (rules, not model) -> feeds back to orchestrator
+```
+
+Baseline comparator: IsolationForest, run in parallel during evaluation/ablation to confirm the reservoir+ridge approach is actually earning its complexity — keep both in the benchmark suite permanently, not just at initial validation, so future regressions are caught against a simpler baseline.
+
+### B.3 Data contracts
+
+```python
+class TrajectoryEvent(BaseModel):
+    step_index: int
+    agent_id: str
+    tool_called: str | None
+    tool_args_hash: str          # hash, not raw args — avoid leaking sensitive payloads into the model pipeline
+    latency_ms: int
+    outcome: Literal["success", "error", "timeout"]
+    timestamp: datetime
+
+class StepAnomalyScore(BaseModel):
+    step_index: int
+    score: float                 # raw ridge-regression output
+    is_anomalous: bool           # score > threshold, threshold is versioned config, not a magic number in code
+    baseline_score: float        # IsolationForest score for the same step, logged for drift comparison
+
+class TrajectoryAssessment(BaseModel):
+    trajectory_id: str
+    agent_id: str
+    step_scores: list[StepAnomalyScore]
+    anomaly_detected: bool
+    localized_steps: list[int]           # which step_indices triggered
+    recommended_action: Literal["none", "flag", "rollback_and_retry", "escalate"]
+    incomplete_sources: list[str]        # e.g. ["missing-trailing-events"] if trajectory was truncated
+    scoring_formula_version: str
+    model_version: str                   # reservoir+ridge model artifact version, for reproducibility
+```
+
+Note there is **no LLM-produced field anywhere in `TrajectoryAssessment`**. This dimension should be implementable and testable with zero live model calls in its critical path — that's a deliberate design property, not an oversight.
+
+### B.4 Service surface (FastAPI, per existing prototype)
+
+```
+POST /trajectory/score
+  body: { trajectory_id, events: [TrajectoryEvent, ...] }
+  returns: TrajectoryAssessment
+
+GET /trajectory/{trajectory_id}/assessment
+  returns: TrajectoryAssessment (cached/last-computed)
+
+POST /trajectory/model/reload
+  admin-only: hot-reload a new reservoir/ridge model artifact version without service restart
+```
+
+### B.5 Rollback-and-retry integration
+
+`recommended_action` is produced by **fixed rules operating on `step_scores` and `anomaly_detected`**, e.g.:
+
+```python
+def determine_action(assessment_input) -> Literal["none","flag","rollback_and_retry","escalate"]:
+    # TODO(spec-gap): exact thresholds should come from versioned config,
+    # not be hardcoded here — confirm with existing BudgetEnforcementAdvisor
+    # config pattern in ACES for consistency.
+    ...
+```
+
+This function must be unit-testable with fixed inputs and fixed expected outputs — no model call inside it.
+
+### B.6 Test suite requirements
+
+- Benchmark suite with ablations (already prototyped) — keep as a regression gate in CI, not a one-time validation.
+- IsolationForest baseline comparison run on every model artifact update.
+- pytest suite covering: encoder determinism (same input -> same embedding), scorer threshold boundary cases, localization correctness on synthetic injected-anomaly trajectories, and `incomplete_sources` population when events are missing/truncated.
+- Load/latency test: this dimension sits in a runtime path (potentially gating rollback), so p99 latency budget must be defined and tested against explicitly.
+
+### B.7 TrustScore integration
+
+Add `TRAJECTORY_INTEGRITY` as a 6th weighted dimension. Weighting change requires a `scoringFormulaVersion` bump per A.3, and existing TrustScore consumers must be able to distinguish scores computed under the old 5-dimension formula from the new 6-dimension one.
+
+---
+
+## Part C — EVAL_RELIABILITY (5th TrustScore dimension)
+
+### C.1 Purpose
+
+Score how reliable the *evaluation layer itself* is — i.e., is AgentEvalJudge's judgment on a given agent run trustworthy enough to feed the other TrustScore dimensions. This is a meta-dimension: it evaluates the evaluator, which is exactly why it must be held to a stricter contract than the thing it's evaluating.
+
+### C.2 Architecture
+
+```
+Agent run/trajectory + task context
+        |
+        v
+AgentEvalJudge (bounded LLM, via gateway) -> per-criterion ModelFinding (Part A.2 contract)
+        |
+        v
+ModelFindingValidator (Part A.4) -> pass/fail per finding
+        |
+        v
+EvalHarness -> runs judge against versioned eval set, tracks agreement-with-human-reviewed-incidents
+        |
+        v
+EVAL_RELIABILITY score (code, from validated findings + EvalHarness historical agreement rate)
+```
+
+### C.3 AgentEvalJudge — bounded LLM contract
+
+AgentEvalJudge must be scoped to produce **categorical judgments with evidence references only** — never a raw reliability number.
 
 ```java
-package com.jpmc.aces.aria.model;
-
-public enum ActionType {
-    PULL_REQUEST_SUBMIT,
-    PULL_REQUEST_MERGE,
-    FILE_WRITE,
-    FILE_DELETE,
-    CI_CONFIGURATION_CHANGE,
-    DATABASE_MIGRATION,
-    SECRETS_ACCESS,
-    AGENT_INVOCATION;
-
-    public boolean isHighRisk() {
-        return this == DATABASE_MIGRATION || 
-               this == SECRETS_ACCESS || 
-               this == FILE_DELETE;
-    }
-}
+public record JudgeCriterionFinding(
+    String criterionId,                       // e.g. "goal_completion", "tool_use_correctness"
+    Literal category,                         // e.g. "met" | "partially_met" | "not_met" | "unclear"
+    String rationale,                          // length-capped per A.4
+    List<String> evidenceIds,                  // must reference actual trajectory/log event IDs
+    double rawModelConfidence,                 // observability only — see A.2
+    boolean requiresEscalation
+) {}
 ```
 
-### 1.4 `AdvisoryResult.java`
+Prompt design constraint: the prompt must require the model to cite `evidenceIds` for every criterion — a finding with an empty `evidenceIds` list on a criterion that claims a specific outcome should fail validation (extend check 2 in A.4: not just "do cited IDs exist" but "are IDs cited when the category is decisive").
 
-```java
-package com.jpmc.aces.aria.model;
+### C.4 EvalHarness
 
-import java.util.List;
+EvalHarness owns:
 
-/**
- * Result returned by an AgentActionAdvisor.
- * Use static factory methods — do not call constructor directly.
- */
-public record AdvisoryResult(
-    Decision decision,
-    String message,
-    List<Object> findings,
-    ScoreImpact scoreImpact
-) {
-    public enum Decision { PASS, REQUIRE_REVIEW, REQUIRE_JUSTIFICATION, BLOCK, NOT_APPLICABLE }
+- **Versioned eval set**: fixed (input, expected-criterion-outcome) pairs, curated from real reviewed incidents. Must be re-run on every prompt/model version change (per A.7).
+- **Agreement tracking**: computes agreement rate between AgentEvalJudge output and human-reviewed ground truth over time — this is a first-class metric, not a one-off validation run.
+- **Drift detection**: compares `rawModelConfidence` distribution and invalid-output rate over time to flag silent model/prompt drift before it shows up as a real disagreement.
 
-    public boolean isBlocking() { return decision == Decision.BLOCK; }
-    public boolean requiresHuman() {
-        return decision == Decision.REQUIRE_REVIEW || decision == Decision.REQUIRE_JUSTIFICATION;
-    }
-
-    public static AdvisoryResult pass(String message) {
-        return new AdvisoryResult(Decision.PASS, message, List.of(), ScoreImpact.none());
-    }
-    public static AdvisoryResult notApplicable() {
-        return new AdvisoryResult(Decision.NOT_APPLICABLE, "", List.of(), ScoreImpact.none());
-    }
-    public static AdvisoryResult block(String message, List<?> violations) {
-        return new AdvisoryResult(Decision.BLOCK, message, List.copyOf(violations), ScoreImpact.critical());
-    }
-    public static AdvisoryResult requireReview(String message, List<?> findings, ScoreImpact impact) {
-        return new AdvisoryResult(Decision.REQUIRE_REVIEW, message, List.copyOf(findings), impact);
-    }
-    public static AdvisoryResult requireJustification(String message, List<?> findings, ScoreImpact impact) {
-        return new AdvisoryResult(Decision.REQUIRE_JUSTIFICATION, message, List.copyOf(findings), impact);
-    }
-}
+```python
+class EvalHarnessRun(BaseModel):
+    run_id: str
+    judge_model_version: str
+    prompt_version: str
+    eval_set_version: str
+    total_cases: int
+    valid_output_count: int          # passed ModelFindingValidator
+    agreement_with_ground_truth: float
+    escalation_rate: float
+    mean_latency_ms: float
+    run_timestamp: datetime
 ```
 
----
+### C.5 EVAL_RELIABILITY scoring formula
 
-## Component 2: Advisor Interface
+Computed entirely in code from EvalHarness historical data plus the current run's validated findings — never a number the judge asserts about itself:
 
-```java
-package com.jpmc.aces.aria.advisors;
-
-import com.jpmc.aces.aria.model.AdvisoryResult;
-import com.jpmc.aces.aria.model.AgentAction;
-import com.jpmc.aces.aria.model.AgentContext;
-
-/**
- * Contract for all ARIA action advisors.
- * Each advisor evaluates one concern (CI integrity, duplication, etc.)
- * Advisors are composited by AriaGovernanceGateway.
- */
-public interface AgentActionAdvisor {
-    AdvisoryResult evaluate(AgentAction action, AgentContext context);
-    
-    /** Short name for logging and PR annotations */
-    default String name() {
-        return this.getClass().getSimpleName();
-    }
-}
 ```
-
----
-
-## Component 3: `CIIntegrityAdvisor`
-
-**File:** `aria-core/src/main/java/com/jpmc/aces/aria/advisors/CIIntegrityAdvisor.java`
-
-**Dependencies to inject:**
-- `CIBaselineRepository baselineRepo` — fetches baseline CI config from PostgreSQL
-- `TrustScoreContributor trustScorer` — applies trust penalties
-
-**Logic to implement:**
-
-1. If action is not `PULL_REQUEST_SUBMIT`, return `AdvisoryResult.notApplicable()`
-2. Extract files from the diff matching these glob patterns:
-   - `.github/workflows/**`
-   - `**/pom.xml`
-   - `**/*Test*.java`, `**/*Spec*.java`
-3. For each matched file, run four checks — **all four are hard blocks if violated:**
-   - **Coverage threshold reduction:** compare `failsafe.threshold` and `jacoco.minimum` against baseline. If the new value is lower, block.
-   - **Failure suppression:** detect `|| true` in CI steps (use regex `\|\| true`). Block if found.
-   - **Tests removed:** detect `@Disabled` annotations added or `@Test` methods removed. Block if found.
-   - **Permissions escalation:** detect `permissions: write-all` or removal of `permissions: read-all`. Block if found.
-4. If any violations exist: apply `TrustPenalty.CI_INTEGRITY_VIOLATION` and return `AdvisoryResult.block()`
-5. If no violations: return `AdvisoryResult.pass()`
-
-**Critical:** CI violations are HARD BLOCKS. They bypass trust tier checks. An agent with a 0.99 trust score cannot override a CI integrity block.
-
-**Test cases to implement in `CIIntegrityAdvisorTest.java`:**
-- `shouldBlockWhenCoverageThresholdReduced()`
-- `shouldBlockWhenOrTrueAddedToCIStep()`
-- `shouldBlockWhenTestAnnotatedDisabled()`
-- `shouldBlockWhenWorkflowPermissionsEscalated()`
-- `shouldPassWhenNoCIChangesPresent()`
-- `shouldPassWhenCIChangesAreAdditive()`
-
----
-
-## Component 4: `SemanticDeduplicationAdvisor`
-
-**File:** `aria-core/src/main/java/com/jpmc/aces/aria/advisors/SemanticDeduplicationAdvisor.java`
-
-**Dependencies to inject:**
-- `EmbeddingModel embeddingModel` — Spring AI `EmbeddingModel` bean
-- `CodeIndexRepository codeIndex` — pgvector semantic search
-- `double SIMILARITY_THRESHOLD = 0.87` — configurable via `@Value("${aria.dedup.threshold:0.87}")`
-
-**Logic to implement:**
-
-1. Extract new Spring components from diff: classes annotated with `@Component`, `@Service`, `@Repository`, `@Validator`, or utility classes with only static methods.
-2. For each new component, build a semantic signature:
-   ```
-   "Component: {ClassName}\nPurpose: {first Javadoc sentence or class name}\nPublic interface: {comma-separated public method signatures}"
-   ```
-3. Embed the signature using `embeddingModel.embed(signature)`
-4. Query `CodeIndexRepository.findSimilar(embedding, threshold, limit=5)`
-5. For each match with similarity >= threshold (excluding the file itself): create a `DuplicateSignal` record with:
-   - Proposed component name and path
-   - Existing component path and similarity score
-   - Functional gap: public methods in proposed that don't exist in the match
-6. If duplicates found: return `AdvisoryResult.requireJustification()` with `ScoreImpact.penalty(SignalType.CODE_DUPLICATION, 0.15 * count)`
-7. If no duplicates: return `AdvisoryResult.pass()`
-
-**PostgreSQL query for `CodeIndexRepository.findSimilar()`:**
-
-```sql
-SELECT 
-    path,
-    component_name,
-    public_interface_summary,
-    1 - (embedding <=> $1::vector) AS similarity
-FROM code_component_index
-WHERE 
-    component_type IN ('SERVICE', 'COMPONENT', 'UTILITY', 'VALIDATOR')
-    AND (1 - (embedding <=> $1::vector)) >= $2
-ORDER BY similarity DESC
-LIMIT $3;
-```
-
-Use `JdbcTemplate` for this query. Map results to a `CodeMatch` record.
-
-**Table DDL to include in migration:**
-
-```sql
-CREATE TABLE code_component_index (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    path TEXT NOT NULL,
-    component_name TEXT NOT NULL,
-    component_type TEXT NOT NULL,
-    public_interface_summary TEXT,
-    embedding vector(1536),
-    indexed_at TIMESTAMPTZ DEFAULT now()
-);
-CREATE INDEX ON code_component_index USING ivfflat (embedding vector_cosine_ops);
-```
-
-**Test cases:**
-- `shouldFlagDuplicateComponentAboveThreshold()`
-- `shouldPassComponentBelowSimilarityThreshold()`
-- `shouldIgnoreSelfMatchInDeduplication()`
-- `shouldComputeFunctionalGapCorrectly()`
-
----
-
-## Component 5: `BehavioralTraceAdvisor`
-
-**File:** `aria-core/src/main/java/com/jpmc/aces/aria/advisors/BehavioralTraceAdvisor.java`
-
-**Dependencies to inject:**
-- `ConcurrencyPatternDetector concurrencyDetector`
-- `BoundaryConditionScanner boundaryScanner`
-
-**Logic to implement for each logic change in the diff:**
-
-1. **Untested logic change:** If a non-trivial method body changed but no `*Test*.java` file in the diff touches that method's class — flag as `FindingType.UNTESTED_LOGIC_CHANGE`.
-
-2. **Concurrency risk:** Detect read-modify-write pattern on `@Repository`-injected objects outside `@Transactional`. Specifically:
-   - A repository `findBy*` call followed by
-   - A field mutation on the returned entity followed by
-   - A repository `save()` call
-   - Where none of the three is inside a `@Transactional` method or uses `@Lock` or `.compareAndSet()`
-   
-   Flag as `FindingType.CONCURRENCY_RISK`.
-
-3. **Boundary conditions:** Scan for:
-   - Array/list access without bounds check
-   - Integer arithmetic (multiplication, addition) on `int` types without overflow guard
-   - Nullable returns used without null check
-   
-   Flag as `FindingType.UNCHECKED_BOUNDARY`.
-
-4. **Missing permission check:** If the changed method is annotated `@PreAuthorize`, `@Secured`, or the class is annotated `@RolesAllowed` — verify all code branches check authorization. If a new branch is added without authorization guard — flag as `FindingType.MISSING_PERMISSION_CHECK`.
-
-5. Compute severity-weighted penalty: each finding type has a weight:
-   - `UNTESTED_LOGIC_CHANGE`: 0.10
-   - `CONCURRENCY_RISK`: 0.20
-   - `UNCHECKED_BOUNDARY`: 0.10
-   - `MISSING_PERMISSION_CHECK`: 0.25
-   
-   Sum weights. If total > 0: return `AdvisoryResult.requireReview()` with penalty.
-
-**Test cases:**
-- `shouldFlagUntestedLogicChange()`
-- `shouldFlagNonTransactionalReadModifyWrite()`
-- `shouldPassTransactionalReadModifyWrite()`
-- `shouldFlagIntegerOverflowRisk()`
-- `shouldFlagMissingPermissionCheckOnNewBranch()`
-
----
-
-## Component 6: `PRScopeGovernor`
-
-**File:** `aria-core/src/main/java/com/jpmc/aces/aria/governors/PRScopeGovernor.java`
-
-**Constants (externalize via `@Value`):**
-- `aria.governance.max-files-without-plan=10`
-- `aria.governance.max-modules=3`
-- `aria.governance.min-description-words=50`
-
-**Logic:**
-
-1. If PR file count > `maxFilesWithoutPlan` AND description does not contain `## Implementation Plan` or `## Changes by Module`: add scope violation.
-2. If distinct Maven modules touched > `maxModules`: add scope violation.
-3. If description word count < `minDescriptionWords` OR description matches generic template patterns (e.g., contains "Agent-generated" with no additional content): add scope violation.
-4. If more than 2 distinct functional concern clusters in touched files (group by: tests, migrations, config, domain logic, API layer): add scope violation.
-5. Return `GovernanceDecision.block()` if any violations, else `GovernanceDecision.permit()`.
-
-**Note:** `GovernanceDecision` is distinct from `AdvisoryResult`. Governors enforce structural policy; advisors evaluate content quality.
-
----
-
-## Component 7: `PromptIntegrityFilter`
-
-**File:** `aria-core/src/main/java/com/jpmc/aces/aria/filters/PromptIntegrityFilter.java`
-
-**Dependencies:**
-- `TokenScopeValidator tokenScopeValidator`
-- `SecretsLeakDetector secretsLeakDetector`
-
-**Injection patterns to detect (compile as `List<Pattern>` at class init):**
-
-```java
-List.of(
-    Pattern.compile("(?i)ignore previous instructions"),
-    Pattern.compile("(?i)system override"),
-    Pattern.compile("(?i)your (actual|real|true) (task|goal|instruction)"),
-    Pattern.compile("(?i)disregard (all|any|the) (above|previous|prior)"),
-    Pattern.compile("(?i)new (system|instruction|directive):"),
-    Pattern.compile("(?i)forget (everything|all) (above|before|prior)")
+eval_reliability_score = f(
+    current_run_valid_output_rate,      # from ModelFindingValidator results this run
+    rolling_agreement_rate,             # from EvalHarness historical runs (e.g. trailing N runs)
+    escalation_rate_delta,              # deviation from historical baseline — spikes indicate drift
 )
 ```
 
-**Logic:**
+`// TODO(spec-gap): exact weighting/decay function for the rolling agreement rate needs a decision — recommend exponential decay favoring recent EvalHarness runs so the score reflects current judge reliability, not a stale average. Confirm window size with team before hardcoding.`
 
-1. Extract untrusted sources from request: PR title, PR body, commit messages, build log excerpts. Each source is labeled.
-2. For each untrusted source, scan against all injection patterns. If any match: add `IntegrityViolation` with label and matched pattern.
-3. Validate token scope: agent token claims must cover all `requestedActions`. If any action not in token scope: add violation.
-4. Scan prompt content for secrets patterns: AWS key format, JWT format, `GITHUB_TOKEN=`, `password=`, `secret=` in key-value pairs. If detected: add violation.
-5. If request is `EXECUTE` class action (any action in `ActionType.isHighRisk()`) and no human approval token present: add violation.
-6. If violations: return `FilterResult.block(violations)`
-7. If no violations: sanitize all untrusted content (wrap in double quotes, escape internal quotes) and return `FilterResult.permit(sanitizedRequest)`
+### C.6 Test suite requirements
 
-**Test cases:**
-- `shouldBlockOnKnownInjectionPattern()`
-- `shouldBlockOnTokenScopeExceedingGranted()`
-- `shouldBlockOnSecretsInPromptContent()`
-- `shouldBlockExecutionActionWithoutHumanApproval()`
-- `shouldSanitizeUntrustedContentOnPermit()`
-- `shouldPermitCleanInvocationRequest()`
+- `ModelFindingValidator` tests reused from Part A, plus the extended "decisive category requires evidence" rule from C.3.
+- EvalHarness regression tests: fixed eval-set subset with known expected agreement rate; CI should fail if agreement drops below a defined floor.
+- Drift simulation test: feed EvalHarness a deliberately degraded judge (e.g. shuffled/randomized outputs) and confirm `eval_reliability_score` drops accordingly — this proves the metric is sensitive, not just present.
+
+### C.7 TrustScore integration
+
+Add `EVAL_RELIABILITY` as the 5th weighted dimension, ordered before `TRAJECTORY_INTEGRITY` (6th) per existing rollout sequencing. Because this dimension scores the reliability of the evaluation layer itself, define explicitly what happens to the *other* four dimensions' scores when `EVAL_RELIABILITY` is low — recommend flagging the overall TrustScore as `low_confidence` rather than silently averaging in a low-reliability judge's findings at full weight.
 
 ---
 
-## Component 8: `AriaGovernanceGateway`
+## Cross-cutting acceptance criteria
 
-**File:** `aria-core/src/main/java/com/jpmc/aces/aria/gateway/AriaGovernanceGateway.java`
+Implementation is complete when:
 
-This is the orchestrating component — it runs all advisors and governors and produces a final `GovernanceDecision`.
+1. `ModelFinding`, `ModelFindingValidator`, `DimensionAssessment`, and `FailurePolicy` exist as shared components used identically by TRAJECTORY_INTEGRITY-adjacent code (if it ever needs a bounded LLM call) and EVAL_RELIABILITY — no per-dimension duplicate validation logic.
+2. No TrustScore dimension's numeric score field is ever assigned directly from LLM output — grep-able rule: no `score = ` or `.score(` assignment appears inside a class that also constructs a prompt or calls the gateway.
+3. Every bounded LLM call site has a declared `FailurePolicy` and emits the full observability field set from A.6.
+4. `scoringFormulaVersion` is present and enforced (non-nullable) on every `DimensionAssessment`.
+5. TRAJECTORY_INTEGRITY's critical path (event -> assessment -> recommended_action) has zero live LLM calls, confirmed by test coverage that mocks/asserts no gateway client is invoked.
+6. EVAL_RELIABILITY's score is reproducible: running EvalHarness twice against the same eval-set version and judge/prompt version produces the same `agreement_with_ground_truth` within defined tolerance.
+7. TrustScore aggregation is updated to 6 weighted dimensions with a version bump, and old (4- or 5-dimension) assessments remain distinguishable and interpretable via `scoringFormulaVersion`.
 
-**Dependencies:**
-- `List<AgentActionAdvisor> advisors` — Spring injects all registered advisors
-- `List<AgentActionGovernor> governors` — Spring injects all registered governors
-- `TrustScoreService trustScoreService`
+## Open items requiring a team decision before/during implementation
 
-**Logic:**
-
-```
-1. Load current TrustScore for context.agentId()
-2. If tier == SUSPENDED: return GovernanceDecision.block("Agent suspended") immediately
-3. Run all governors first (structural policy — hard blocks)
-   - If ANY governor returns BLOCK: return GovernanceDecision.block() with all violations
-4. Run all advisors (content quality — scored)
-   - Collect all AdvisoryResults
-   - Apply all ScoreImpacts to a mutable score accumulator
-   - If ANY advisor returns BLOCK: return GovernanceDecision.block()
-   - If ANY advisor returns REQUIRE_REVIEW or REQUIRE_JUSTIFICATION: flag for review
-5. Persist updated TrustScore to TimescaleDB
-6. Determine final decision:
-   - If any BLOCK: GovernanceDecision.block()
-   - If tier == TRUSTED AND no REQUIRE_REVIEW flags: GovernanceDecision.permit()
-   - Otherwise: GovernanceDecision.requireReview() with all findings for PR annotation
-7. Generate ARIA PR annotation body (Markdown) and attach to decision
-```
-
-**TimescaleDB persistence:**
-
-Store trust score events in a hypertable for time-series analysis:
-
-```sql
-CREATE TABLE aria_trust_events (
-    event_time TIMESTAMPTZ NOT NULL,
-    agent_id TEXT NOT NULL,
-    session_id TEXT,
-    action_type TEXT,
-    behavioral_score DECIMAL(4,3),
-    structural_score DECIMAL(4,3),
-    integrity_score DECIMAL(4,3),
-    budget_score DECIMAL(4,3),
-    composite_score DECIMAL(4,3),
-    tier TEXT,
-    decision TEXT,
-    findings JSONB
-);
-SELECT create_hypertable('aria_trust_events', 'event_time');
-```
-
-Use `JdbcTemplate` for inserts. Do not use JPA on this table.
-
----
-
-## Component 9: `AutoFixOrchestrator` (Integration)
-
-**File:** `aces-autofix/src/main/java/com/jpmc/aces/autofix/orchestration/AutoFixOrchestrator.java`
-
-**This component lives in the `aces-autofix` module, not `aria-core`.**
-
-Implement the full orchestration flow:
-
-```
-CIFailureEvent → PromptIntegrityFilter → AutoFixAgentRunner → AriaGovernanceGateway → JulesPRClient
-```
-
-All five steps must execute sequentially. If any step returns a block, stop and return `FixResult.blocked()`. Do not swallow exceptions — propagate them with structured log context:
-
-```java
-log.error("AutoFix orchestration failed: agentId={} sessionId={} step={} reason={}",
-    context.agentId(), context.sessionId(), failedStep, error.getMessage());
-```
-
----
-
-## Wire-up and Configuration
-
-### `application.yml` properties to add:
-
-```yaml
-aria:
-  trust:
-    minimum-threshold: 0.75
-    auto-merge-threshold: 0.85
-  dedup:
-    threshold: 0.87
-    enabled: true
-  governance:
-    max-files-without-plan: 10
-    max-modules: 3
-    min-description-words: 50
-  injection:
-    patterns-enabled: true
-    execution-approval-required: true
-```
-
-### Spring bean registration:
-
-All advisors and governors must be `@Component`-annotated. Spring auto-discovers and injects them into `AriaGovernanceGateway` via `List<AgentActionAdvisor>` injection. Do not manually wire them.
-
----
-
-## Testing Requirements
-
-Every component requires unit tests with:
-- Mockito mocks for all injected dependencies
-- One test per named test case in this spec
-- At least one integration test using Testcontainers (PostgreSQL with pgvector extension) for:
-  - `SemanticDeduplicationAdvisor` (needs real pgvector similarity query)
-  - `TrustScoreRepository` (needs real TimescaleDB hypertable)
-
-**Testcontainers dependency:**
-
-```xml
-<dependency>
-    <groupId>org.testcontainers</groupId>
-    <artifactId>postgresql</artifactId>
-    <scope>test</scope>
-</dependency>
-```
-
-Use the `pgvector/pgvector:pg16` Docker image for integration tests.
-
----
-
-## What NOT to Do
-
-1. **Do not use JPA / Hibernate** on the pgvector or TimescaleDB tables. Use `JdbcTemplate` directly.
-2. **Do not add new Maven dependencies** not listed in this spec without flagging it as a comment in the implementation.
-3. **Do not implement ARIA advisors as Spring AOP aspects** — they are explicit domain objects invoked by `AriaGovernanceGateway`.
-4. **Do not use `Optional.get()` without `isPresent()` check** — use `orElseThrow()` with meaningful messages.
-5. **Do not log sensitive content** — PR bodies, build logs, and prompt content must be truncated to 200 characters max in log statements.
-6. **Do not auto-approve any action** if `TrustTier == SUSPENDED`. This check is unconditional.
-
----
-
-## Deliverables Checklist
-
-- [ ] All model records in `model/` package
-- [ ] `AgentActionAdvisor` interface
-- [ ] `CIIntegrityAdvisor` with all 4 checks + 6 unit tests
-- [ ] `SemanticDeduplicationAdvisor` with pgvector query + 4 unit tests + 1 integration test
-- [ ] `BehavioralTraceAdvisor` with 4 finding types + 5 unit tests
-- [ ] `PRScopeGovernor` with 4 rules + tests
-- [ ] `PromptIntegrityFilter` with injection patterns, scope, secrets + 6 unit tests
-- [ ] `AriaGovernanceGateway` orchestrating all above
-- [ ] TimescaleDB schema migration for `aria_trust_events`
-- [ ] pgvector schema migration for `code_component_index`
-- [ ] `AutoFixOrchestrator` integration in `aces-autofix` module
-- [ ] `application.yml` properties
-- [ ] All Testcontainers integration tests passing
+- Exact weight values for the 6-dimension TrustScore formula.
+- Rolling window size and decay function for EVAL_RELIABILITY's agreement-rate component.
+- Whether `low_confidence` TrustScore flagging (C.7) blocks downstream automated actions or only surfaces a warning — this is a policy decision, not an engineering one, and should be confirmed with governance stakeholders before hardcoding behavior.
+- Threshold values for TRAJECTORY_INTEGRITY's anomaly scorer — should come from versioned config consistent with BudgetEnforcementAdvisor's existing pattern, not literals in code.
