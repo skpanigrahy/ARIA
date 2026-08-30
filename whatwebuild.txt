@@ -1,0 +1,37 @@
+Act as a technical documentation auditor for this codebase, not a marketing writer.
+For each component I list below, inspect the actual source files and tests and report:
+
+1. Purpose: what problem does this component solve, in one sentence, based on
+   what the code actually does (not what a comment claims it does).
+2. Inputs / outputs: what does it receive, what does it return or emit.
+3. Core logic: the actual algorithm or decision logic, in plain steps — not a
+   paraphrase of class names.
+4. Key files/classes: exact file paths and class names involved.
+5. Test coverage: which test files exercise this component, and what specific
+   behavior each test actually verifies (read the test bodies, don't guess
+   from filenames).
+6. Status: is this fully implemented and wired into the running system, partially
+   implemented, or just scaffolding/interfaces with no real logic behind them?
+   Be blunt if it's a stub.
+7. Gaps: anything referenced in design docs, comments, or TODOs that isn't
+   actually implemented yet.
+
+Components to audit:
+- TrustScore (all dimensions: behavioral, structural, integrity, budget adherence,
+  eval reliability, trajectory integrity)
+- AutoFixOrchestrator / AutoFixAgent
+- ReasoningBank
+- SemanticCacheAdvisor
+- CostAwareModelRouter
+- BudgetEnforcementAdvisor
+- MemoryDistillationJob
+- AmbientMonitorAgent
+- AgentEvalJudge / EvalHarness
+- Trajectory integrity pipeline (encoder, IsolationForest baseline, benchmark suite)
+
+Do not summarize from memory of our chat history or from design docs alone —
+verify against the actual current source and test files. If something is
+described in a doc but you can't find the implementation, say so explicitly
+rather than assuming it exists.
+
+Output as a markdown doc, one section per component.
